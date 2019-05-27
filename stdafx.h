@@ -43,10 +43,13 @@
 #include <schannel.h>
 #define SECURITY_WIN32
 #include <security.h>
-#include <winrt/base.h>
 #include <atlbase.h>
 
+#define USE_UWP
 
+#ifdef USE_UWP
+
+#include <winrt/base.h>
 #include <winrt/Windows.system.h>
 #include <winrt/Windows.UI.Core.h>
 #include <winrt/Windows.UI.Text.h>
@@ -63,3 +66,4 @@
 
 
 
+#endif

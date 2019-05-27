@@ -5510,7 +5510,7 @@ namespace RGF
 
 			virtual HRESULT Upload2(bool Resumable, HANDLE hX, const char * arr,unsigned long long arrs, const char* folderid, const char* filename, string & resumedata, string & returndata, std::function<HRESULT(unsigned long long f, unsigned long long t, void* lp)> fx, void* lp)
 			{
-				if (arrs > (3 * 1024 * 1024))
+				if (arrs > (2 * 1024 * 1024))
 					return UploadLong(arr, arrs, folderid, filename, resumedata, returndata, fx, lp);
 				UNREFERENCED_PARAMETER(resumedata);
 				UNREFERENCED_PARAMETER(Resumable);
@@ -5543,8 +5543,7 @@ namespace RGF
 
 					ystring re;
 
-					// The following one won't work, but it should
-					re.Format(L"/v1.0/me/drive/items/%S/oneDrive.createUploadSession", folderid);
+					re.Format(L"/v1.0/me/drive/items/%S:/%S:/createUploadSession", folderid,filename);
 
 					ystring jsn;
 					jsn.Format(L"{	\"item\": {	\"@odata.type\": \"microsoft.graph.driveItemUploadableProperties\",	\"@microsoft.graph.conflictBehavior\" : \"rename\", \"name\" : \"%S\" }}", filename);
@@ -6668,6 +6667,160 @@ namespace RGF
 
 	}
 
+	struct AUTH
+	{
+		std::string id;
+		std::string secret;
+		std::vector<std::string> tokens; // must be 3
+		std::string root; // ID form
+		std::string cd;
+
+	};
+
+	struct RGBF
+	{
+		int func = 0; // 0 save, 1 load
+		HWND hParent = 0;
+		bool NoBrowserKey = false;
+
+		HRESULT rs = E_ABORT;
+		GOD::ystring resultFile;
+		GOD::ystring DefExt;
+		std::vector<wchar_t> Filter;
+
+		std::shared_ptr<RGF::GOD::GOOGLEDRIVE> goo = 0;
+		std::shared_ptr<RGF::GOD::ONEDRIVE> one = 0;
+		std::shared_ptr<RGF::GOD::DROPBOX> drop = 0;
+		AUTH google;
+		AUTH onedrive;
+		AUTH db;
+
+		std::wstring Title;
+
+		// Saving
+		DWORD sz = 0;
+		const char* d = nullptr;
+		std::function<HRESULT(char*, size_t)> cbf = nullptr;
+
+		// Opening
+		std::vector<char>* read = 0;
+
+
+		// For Old style only
+		bool ShouldCancelProp = false;
+
+	};
+
+	struct INSAVE
+	{
+		HWND hh = 0;
+		bool ShouldCancel = false;
+		RGBF* s;
+	};
+
+
+	void EnumNames(RGF::GOD::DRIVE& dd, std::string& j1, std::vector<std::tuple<std::string, std::string, std::string>>* all, int AT, int DirOnly = 0)
+	{
+		using namespace std;
+		using namespace RGF;
+		jsonxx::Object jjj;
+		jjj.parse(j1.c_str());
+		jsonxx::Array j5 = jjj.get<jsonxx::Array>(AT == 3 ? "entries" : AT == 2 ? "value" : "items");
+		//	MessageBoxA(0, j1.c_str(), 0, 0);
+		for (unsigned int jj1 = 0; jj1 < j5.size(); jj1++)
+		{
+			auto el = j5.get<jsonxx::Object>(jj1);
+			string jsi = dd.ItemProps(el.get<jsonxx::String>("id").c_str());
+			if (jsi.length() == 0)
+				continue;
+
+			jsonxx::Object js;
+			string titl;
+			js.parse(jsi.c_str());
+
+			if (AT == 2)
+				js = el;
+
+			if (AT == 3 || AT == 2)
+				titl = js.get<jsonxx::String>("name");
+			else
+				titl = js.get<jsonxx::String>("title");
+
+			// Remove & from title
+			for (auto& cc : titl)
+			{
+				if (cc == '&')
+					cc = '_';
+			}
+
+			auto id = js.get<jsonxx::String>("id");
+
+			if (AT == 2)
+			{
+				bool Fold = false;
+				if (js.has<jsonxx::Object>("folder"))
+					Fold = true;
+				if (DirOnly)
+				{
+					if (Fold)
+					{
+						auto tu = make_tuple<string, string, string>(move(id), move(titl), move("application/vnd.google-apps.folder"));
+						if (all)
+							all->push_back(tu);
+					}
+				}
+				else
+				{
+					auto tu = make_tuple<string, string, string>(move(id), move(titl), move(Fold ? "application/vnd.google-apps.folder" : ""));
+					if (all)
+						all->push_back(tu);
+				}
+			}
+			else
+			{
+				auto mi = js.get<jsonxx::String>("mimeType");
+				if (DirOnly)
+				{
+					if (mi == "application/vnd.google-apps.folder")
+					{
+						auto tu = make_tuple<string, string, string>(move(id), move(titl), move(mi));
+						if (all)
+							all->push_back(tu);
+					}
+				}
+				else
+				{
+					auto tu = make_tuple<string, string, string>(move(id), move(titl), move(mi));
+					if (all)
+						all->push_back(tu);
+				}
+			}
+		}
+
+		std::sort(all->begin(), all->end(), [](const std::tuple<std::string, std::string, std::string>& i1, const std::tuple<std::string, std::string, std::string>& i2) -> bool
+			{
+				std::string mi1 = std::get<2>(i1);
+				std::string mi2 = std::get<2>(i2);
+				if (mi1 == "application/vnd.google-apps.folder" && mi2 != "application/vnd.google-apps.folder")
+					return true;
+				if (mi2 == "application/vnd.google-apps.folder" && mi1 != "application/vnd.google-apps.folder")
+					return false;
+
+				if (std::get<1>(i1) < std::get<1>(i2))
+					return true;
+				return false;
+			});
+
+
+	}
+
+
+	struct LITEM
+	{
+		std::wstring tit;
+		std::string id;
+		bool RootBack = false;
+	};
 
 
 };

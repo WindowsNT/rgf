@@ -20,11 +20,21 @@
     <ClInclude Include="rgf1.hpp">
       <Filter>Code</Filter>
     </ClInclude>
+    <ClInclude Include="rgf2.hpp">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="rgf3.hpp">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="1.manifest" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Readme.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="rgf.rc" />
   </ItemGroup>
 </Project>

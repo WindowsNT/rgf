@@ -1,8 +1,13 @@
 #include "stdafx.h"
 #include "rgf1.hpp"
+#ifdef USE_UWP
 #include "rgf2.hpp"
+#else
+#include "rgf3.hpp"
+#endif
 
 
+#ifdef USE_UWP
 using namespace winrt;
 using namespace Windows::Foundation;
 using namespace Windows::Foundation::Collections;
@@ -18,7 +23,7 @@ using namespace Windows::UI::Xaml::Hosting;
 using namespace Windows::UI::Xaml::Controls;
 using namespace Windows::Media::Core;
 using namespace Windows::UI::Xaml::Markup;
-
+#endif
 
 
 
@@ -26,8 +31,10 @@ using namespace Windows::UI::Xaml::Markup;
 
 int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	{
+#ifdef USE_UWP
 	winrt::init_apartment(apartment_type::single_threaded);
 	WindowsXamlManager windowsXamlManager = WindowsXamlManager::InitializeForCurrentThread();
+#endif
 	WSADATA wData;
 	WSAStartup(MAKEWORD(2, 2), &wData);
 	INITCOMMONCONTROLSEX icex = { 0 };

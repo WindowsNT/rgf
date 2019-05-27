@@ -53,7 +53,6 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	XML3::XML rr("rgf.xml");
 
-	#include "secret.h"
 	/*
 		fill s.google.id, s.google.secret, s.onedrive.id and s.onedrive.secret with your APP ClientID/Secret codes
 	s.google.id  = "...";
@@ -66,6 +65,11 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	// load tokens if we have them
 	s.google.tokens.resize(3);
 	s.onedrive.tokens.resize(3);
+	s.google.id = rr.GetRootElement()["tokens"]["google"].vv("u").GetValue();
+	s.google.secret = rr.GetRootElement()["tokens"]["google"].vv("p").GetValue();
+	s.onedrive.id = rr.GetRootElement()["tokens"]["onedrive"].vv("u").GetValue();
+	s.onedrive.secret = rr.GetRootElement()["tokens"]["onedrive"].vv("p").GetValue();
+
 	s.google.tokens[0] = rr.GetRootElement()["tokens"]["google"].vv("t1").GetValue();
 	s.google.tokens[1] = rr.GetRootElement()["tokens"]["google"].vv("t2").GetValue();
 	s.onedrive.tokens[0] = rr.GetRootElement()["tokens"]["onedrive"].vv("t1").GetValue();

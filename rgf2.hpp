@@ -571,6 +571,8 @@ namespace RGF
 								vrf = s->s->one->Auth(s->s->onedrive.tokens);
 							s->s->onedrive.root = s->s->one->GetRootFolderID();
 
+							// Test
+							//s->s->one->IDFromPath("BACKUPS\\TP2");
 
 							auto lv = Top.FindName(L"oneList").as<ListView>();
 							lv.IsDoubleTapEnabled(true);

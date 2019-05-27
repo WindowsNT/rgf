@@ -5,6 +5,8 @@
 namespace RGF
 {
 
+
+
 	// RKEY
 		// RKEY, quick registry access 
 	class RKEY
@@ -1203,7 +1205,7 @@ namespace RGF
 				if (!ax)
 					return 0;
 				ax->hPar = (HWND)ww;
-				ax->hClosingMessage = ll;
+				ax->hClosingMessage = (UINT)ll;
 				return 0;
 			}
 
@@ -5131,6 +5133,101 @@ namespace RGF
 		};
 
 
+		void EnumNames(RGF::GOD::DRIVE& dd, std::string& j1, std::vector<std::tuple<std::string, std::string, std::string>>* all, int AT, int DirOnly)
+		{
+			using namespace std;
+			using namespace RGF;
+			jsonxx::Object jjj;
+			jjj.parse(j1.c_str());
+			jsonxx::Array j5 = jjj.get<jsonxx::Array>(AT == 3 ? "entries" : AT == 2 ? "value" : "items");
+			//	MessageBoxA(0, j1.c_str(), 0, 0);
+			for (unsigned int jj1 = 0; jj1 < j5.size(); jj1++)
+			{
+				auto el = j5.get<jsonxx::Object>(jj1);
+				string jsi = dd.ItemProps(el.get<jsonxx::String>("id").c_str());
+				if (jsi.length() == 0)
+					continue;
+
+				jsonxx::Object js;
+				string titl;
+				js.parse(jsi.c_str());
+
+				if (AT == 2)
+					js = el;
+
+				if (AT == 3 || AT == 2)
+					titl = js.get<jsonxx::String>("name");
+				else
+					titl = js.get<jsonxx::String>("title");
+
+				// Remove & from title
+				for (auto& cc : titl)
+				{
+					if (cc == '&')
+						cc = '_';
+				}
+
+				auto id = js.get<jsonxx::String>("id");
+
+				if (AT == 2)
+				{
+					bool Fold = false;
+					if (js.has<jsonxx::Object>("folder"))
+						Fold = true;
+					if (DirOnly)
+					{
+						if (Fold)
+						{
+							auto tu = make_tuple<string, string, string>(move(id), move(titl), move("application/vnd.google-apps.folder"));
+							if (all)
+								all->push_back(tu);
+						}
+					}
+					else
+					{
+						auto tu = make_tuple<string, string, string>(move(id), move(titl), move(Fold ? "application/vnd.google-apps.folder" : ""));
+						if (all)
+							all->push_back(tu);
+					}
+				}
+				else
+				{
+					auto mi = js.get<jsonxx::String>("mimeType");
+					if (DirOnly)
+					{
+						if (mi == "application/vnd.google-apps.folder")
+						{
+							auto tu = make_tuple<string, string, string>(move(id), move(titl), move(mi));
+							if (all)
+								all->push_back(tu);
+						}
+					}
+					else
+					{
+						auto tu = make_tuple<string, string, string>(move(id), move(titl), move(mi));
+						if (all)
+							all->push_back(tu);
+					}
+				}
+			}
+
+			std::sort(all->begin(), all->end(), [](const std::tuple<std::string, std::string, std::string>& i1, const std::tuple<std::string, std::string, std::string>& i2) -> bool
+				{
+					std::string mi1 = std::get<2>(i1);
+					std::string mi2 = std::get<2>(i2);
+					if (mi1 == "application/vnd.google-apps.folder" && mi2 != "application/vnd.google-apps.folder")
+						return true;
+					if (mi2 == "application/vnd.google-apps.folder" && mi1 != "application/vnd.google-apps.folder")
+						return false;
+
+					if (std::get<1>(i1) < std::get<1>(i2))
+						return true;
+					return false;
+				});
+
+
+		}
+
 
 
 
@@ -5383,6 +5480,8 @@ namespace RGF
 				if (FAILED(Connect(L"graph.microsoft.com", true)))
 					return "";
 				auto s = GetRootFolderID();
+				wstring h1 = L"Authorization: Bearer ";
+				h1 += access_token;
 				if (!Path)
 					return s;
 
@@ -5390,6 +5489,7 @@ namespace RGF
 				vector<char> P(10000);
 				strcpy_s(P.data(), 10000, Path);
 				char* a0 = P.data();
+				bool Created = false;
 				for (;;)
 				{
 					if (!a0 || !strlen(a0))
@@ -5400,52 +5500,42 @@ namespace RGF
 						* a1 = 0;
 
 
-					// GET https ://graph.microsoft.com/v5.0/folder.a6b2a7e8f2515e5e/files?access_token=ACCESS_TOKEN
+
 					ystring re;
-					re.Format(L"/v5.0/%S/files?access_token=", pr.c_str());
-					re += access_token;
-					auto hi = RequestWithBuffer(re.c_str(), L"GET");
-					vector<char> out;
-					ReadToMemory(hi, out);
-					out.resize(out.size() + 1);
-					char* oout = out.data();
-					j.parse(oout);
-					if (!j.has<jsonxx::Array>("data"))
-						return "";
+					re.Format(L"/v1.0/me/drive/items/%S/children", pr.c_str());
+					auto hi = RequestWithBuffer(re.c_str(), L"GET", { h1, L"Host: graph.microsoft.com" });
+					auto oout = jsonreturn(hi);
+
+					std::vector<std::tuple<std::string, std::string, std::string>> AllItems;
+					EnumNames(*this, oout, &AllItems, 2, 1);
+
 					bool F = false;
-					auto ja = j.get<jsonxx::Array>("data");
-					for (size_t i = 0; i < ja.size(); i++)
+					for (auto& it : AllItems)
 					{
-						auto e = ja.get<jsonxx::Object>((unsigned int)i);
-						if (!e.has<jsonxx::String>("name"))
-							continue;
-						if (_stricmp(e.get<jsonxx::String>("name").c_str(), a0) == 0)
+						if (_stricmp(a0, get<1>(it).c_str()) == 0)
 						{
-							pr = e.get<jsonxx::String>("id");
-							a0 = a1;
-							if (a0)
-								a0++;
-							F = 1;
+							pr = get<0>(it);
+							F = true;
 							break;
 						}
 					}
+
+
 					if (!F)
 					{
-						if (!CreateIfNotExists)
+						if (!CreateIfNotExists || Created)
 							return "";
 						auto cid2 = CreateFolder(a0, pr.c_str());
 						if (cid2.empty())
 							return "";
-						jsonxx::Object j2;
-						j2.parse(cid2.c_str());
-						if (!j2.has<jsonxx::String>("id"))
-							return "";
-						pr = j2.get<jsonxx::String>("id");
-						a0 = a1;
-						if (a0)
-							a0++;
+						Created = true;
 						continue;
 					}
+
+
+					a0 = a1;
+					if (a1 != 0)
+						a0++;
 				}
 			}
 
@@ -6718,101 +6808,6 @@ namespace RGF
 		RGBF* s;
 	};
 
-
-	void EnumNames(RGF::GOD::DRIVE& dd, std::string& j1, std::vector<std::tuple<std::string, std::string, std::string>>* all, int AT, int DirOnly = 0)
-	{
-		using namespace std;
-		using namespace RGF;
-		jsonxx::Object jjj;
-		jjj.parse(j1.c_str());
-		jsonxx::Array j5 = jjj.get<jsonxx::Array>(AT == 3 ? "entries" : AT == 2 ? "value" : "items");
-		//	MessageBoxA(0, j1.c_str(), 0, 0);
-		for (unsigned int jj1 = 0; jj1 < j5.size(); jj1++)
-		{
-			auto el = j5.get<jsonxx::Object>(jj1);
-			string jsi = dd.ItemProps(el.get<jsonxx::String>("id").c_str());
-			if (jsi.length() == 0)
-				continue;
-
-			jsonxx::Object js;
-			string titl;
-			js.parse(jsi.c_str());
-
-			if (AT == 2)
-				js = el;
-
-			if (AT == 3 || AT == 2)
-				titl = js.get<jsonxx::String>("name");
-			else
-				titl = js.get<jsonxx::String>("title");
-
-			// Remove & from title
-			for (auto& cc : titl)
-			{
-				if (cc == '&')
-					cc = '_';
-			}
-
-			auto id = js.get<jsonxx::String>("id");
-
-			if (AT == 2)
-			{
-				bool Fold = false;
-				if (js.has<jsonxx::Object>("folder"))
-					Fold = true;
-				if (DirOnly)
-				{
-					if (Fold)
-					{
-						auto tu = make_tuple<string, string, string>(move(id), move(titl), move("application/vnd.google-apps.folder"));
-						if (all)
-							all->push_back(tu);
-					}
-				}
-				else
-				{
-					auto tu = make_tuple<string, string, string>(move(id), move(titl), move(Fold ? "application/vnd.google-apps.folder" : ""));
-					if (all)
-						all->push_back(tu);
-				}
-			}
-			else
-			{
-				auto mi = js.get<jsonxx::String>("mimeType");
-				if (DirOnly)
-				{
-					if (mi == "application/vnd.google-apps.folder")
-					{
-						auto tu = make_tuple<string, string, string>(move(id), move(titl), move(mi));
-						if (all)
-							all->push_back(tu);
-					}
-				}
-				else
-				{
-					auto tu = make_tuple<string, string, string>(move(id), move(titl), move(mi));
-					if (all)
-						all->push_back(tu);
-				}
-			}
-		}
-
-		std::sort(all->begin(), all->end(), [](const std::tuple<std::string, std::string, std::string>& i1, const std::tuple<std::string, std::string, std::string>& i2) -> bool
-			{
-				std::string mi1 = std::get<2>(i1);
-				std::string mi2 = std::get<2>(i2);
-				if (mi1 == "application/vnd.google-apps.folder" && mi2 != "application/vnd.google-apps.folder")
-					return true;
-				if (mi2 == "application/vnd.google-apps.folder" && mi1 != "application/vnd.google-apps.folder")
-					return false;
-
-				if (std::get<1>(i1) < std::get<1>(i2))
-					return true;
-				return false;
-			});
-
-
-	}
 
 
 	struct LITEM

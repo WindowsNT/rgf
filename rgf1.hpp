@@ -5588,7 +5588,7 @@ namespace RGF
 				wstring h1 = L"Authorization: Bearer ";
 				h1 += access_token;
 
-				auto hi = to == -1 ? RequestWithBuffer(re.c_str(), L"GET", {h1}) : RequestWithBuffer(re.c_str(), L"GET", { range });
+				auto hi = to == -1 ? RequestWithBuffer(re.c_str(), L"GET", {h1}) : RequestWithBuffer(re.c_str(), L"GET", { h1,range });
 				HRESULT hr = 0;
 
 				if (arr)

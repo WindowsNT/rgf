@@ -1133,7 +1133,7 @@ namespace RGF
 						{
 							//							std::function<HRESULT(unsigned long long f, unsigned long long t, void* lp)>
 							std::string ret;
-
+								
 							std::string rd;
 
 							auto hr = s->s->one->Upload2(0,0,s->s->d, s->s->sz, s->s->onedrive.root.c_str(), fi.a_str(),rd, ret,

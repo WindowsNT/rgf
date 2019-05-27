@@ -5149,7 +5149,7 @@ namespace RGF
 				url += L"https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=";
 				url += cid;
 //				url += L"&scope=wl.signin%20wl.offline_access%20wl.basic%20wl.skydrive%20wl.skydrive_update&response_type=code&redirect_uri=http://localhost:";
-				url += L"&scope=Files.ReadWrite.AppFolder&response_type=code&redirect_uri=http://localhost:";
+				url += L"&scope=Files.ReadWrite.AppFolder%20offline_access&response_type=code&redirect_uri=http://localhost:";
 				ystring sport;
 				sport.Format(L"%u", port);
 				url += sport;
@@ -5544,16 +5544,17 @@ namespace RGF
 					ystring re;
 
 					// The following one won't work, but it should
-					re.Format(L"/v1.0/me/drive/items/%S/createUploadSession", folderid);
+					re.Format(L"/v1.0/me/drive/items/%S/oneDrive.createUploadSession", folderid);
 
 					ystring jsn;
 					jsn.Format(L"{	\"item\": {	\"@odata.type\": \"microsoft.graph.driveItemUploadableProperties\",	\"@microsoft.graph.conflictBehavior\" : \"rename\", \"name\" : \"%S\" }}", filename);
-				//	const char* aa = jsn.a_str();
-					auto hi1 = RequestWithBuffer(re.c_str(), L"POST", { h1,L"Content-type: application/json" }, 0,0);
-//					auto hi1 = RequestWithBuffer(re.c_str(), L"POST", { h1,L"Content-type: application/json" }, aa, (size_t)strlen(aa));
+					const char* aa = jsn.a_str();
+					auto hi1 = RequestWithBuffer(re.c_str(), L"POST", { h1,L"Content-type: application/json" }, aa, (size_t)strlen(aa));
 					auto r1 = jsonreturn(hi1);
 					jsonxx::Object o1;
 					o1.parse(r1);
+					if (!o1.has<jsonxx::String>("uploadUrl"))
+						return E_FAIL;
 					ystring uurl = o1.get<jsonxx::String>("uploadUrl");
 
 					unsigned long long step = 327680;

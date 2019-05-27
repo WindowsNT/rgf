@@ -5091,7 +5091,12 @@ namespace RGF
 					return 0;
 				};
 
-				DialogBoxIndirectParam(GetModuleHandle(0), (LPCDLGTEMPLATEW)res, 0, A_DP, (LPARAM)& u);
+				std::thread tx([&]()
+					{
+						CoInitializeEx(0, COINIT_APARTMENTTHREADED);
+						DialogBoxIndirectParam(GetModuleHandle(0), (LPCDLGTEMPLATEW)res, 0, A_DP, (LPARAM)& u);
+					});
+				tx.join();
 
 				//		ShellExecute(0, L"open", url, 0, 0, SW_SHOWNORMAL);
 			}

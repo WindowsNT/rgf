@@ -1,7 +1,197 @@
 
+#pragma comment(lib, "windowsapp")
 
 namespace RGF
 {
+	// UWPLIB
+	namespace UWPLIB
+	{
+		using namespace std;
+		using namespace winrt::Windows::UI::Xaml::Hosting;
+		using namespace winrt::Windows::Foundation::Collections;
+		using namespace winrt::Windows::UI::Xaml::Markup;
+		using namespace winrt::Windows::Foundation;
+		using namespace winrt::Windows::UI;
+		using namespace winrt::Windows::UI::Xaml;
+
+#pragma pack(push,1)
+		struct UWPCONTROL
+		{
+			DesktopWindowXamlSource xs;
+			HWND hParent = 0;
+			HWND hwnd = 0;
+			HWND hwndDetailXamlIsland = 0;
+			winrt::Windows::Foundation::IInspectable ins;
+		};
+
+		struct UWPNOTIFICATION
+		{
+			NMHDR n = { 0 };
+			UWPCONTROL* s = 0;
+		};
+#pragma pack(pop)
+
+#define UWPM_GET_CONTROL (WM_USER + 100)
+
+
+#
+		// ---
+
+		inline map<wstring, UWPCONTROL*> controls;
+
+		inline void GenericDestroy(HWND hh)
+		{
+			UWPCONTROL* s = (UWPCONTROL*)GetProp(hh, L"s");
+			if (s)
+			{
+				auto str = s->ins.as<IFrameworkElement>().Name();
+				controls.erase(str.c_str());
+				RemoveProp(hh, L"s");
+				delete s;
+				s = 0;
+			}
+		}
+
+		template <typename T>
+		void GenericNotify(IInspectable const& sender, int Code)
+		{
+			auto rt = sender.as<T>();
+			auto na = rt.Name();
+			UWPCONTROL* s = 0;
+			controls.readlock([&](const map<wstring, UWPCONTROL*>& m) {
+				s = m.at(na.c_str());
+				});
+			if (!s)
+				return; // Duh
+			UWPNOTIFICATION n;
+			n.n.hwndFrom = s->hwnd;
+			n.n.code = Code;
+			n.n.idFrom = GetDlgCtrlID(s->hwnd);
+			n.s = (UWPCONTROL*)s;
+			SendMessage(s->hParent, WM_NOTIFY, 0, (LPARAM)& n);
+
+		}
+
+		inline bool GetControlByName(const wchar_t* n, UWPCONTROL** ptr)
+		{
+			if (!n || !ptr)
+				return false;
+			UWPCONTROL* s = 0;
+			s = controls.at(n);
+			if (!s)
+				return false;
+			*ptr = s;
+			return true;
+		}
+
+
+
+
+		inline UWPCONTROL* GenericCreate(HWND hP, HWND hh, LPVOID cs)
+		{
+			auto s = new UWPCONTROL;
+			SetProp(hh, L"s", (HANDLE)s);
+			s->hwnd = hh;
+			s->hParent = hP;
+			auto interopDetail = s->xs.as<IDesktopWindowXamlSourceNative>();
+			auto hr = E_FAIL;
+
+			// Generate the string if not there
+			const wchar_t* strx = (const wchar_t*)cs;
+
+			vector<wchar_t> tstr(10000);
+
+			if (strx)
+				hr = interopDetail->AttachToWindow(hh);
+			if (!strx || FAILED(hr))
+			{
+				delete s;
+				RemoveProp(hh, L"s");
+				SetWindowLongPtr(hh, GWLP_USERDATA, 0);
+				return 0;
+			}
+			try
+			{
+				interopDetail->get_WindowHandle(&s->hwndDetailXamlIsland);
+				winrt::param::hstring str(strx);
+				s->ins = XamlReader::Load(str);
+				s->xs.Content(s->ins.as<UIElement>());
+			}
+			catch (...)
+			{
+				delete s;
+				RemoveProp(hh, L"s");
+				SetWindowLongPtr(hh, GWLP_USERDATA, 0);
+				return 0;
+			}
+
+			auto str = s->ins.as<IFrameworkElement>().Name();
+			controls[str.c_str()] = s;
+
+			RECT rc = { 0 };
+			GetClientRect(hh, &rc);
+			MapWindowPoints(hh, hP, (LPPOINT)& rc, 2);
+			//	ShowWindow(hh, SW_HIDE);
+			//	SetWindowPos(s->hwnd, 0, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, SWP_SHOWWINDOW);
+			SetWindowPos(s->hwndDetailXamlIsland, 0, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, SWP_SHOWWINDOW);
+
+
+			GetClientRect(hP, &rc);
+			SetWindowPos(s->hwnd, 0, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, SWP_SHOWWINDOW);
+			//SetWindowPos(s->hwndDetailXamlIsland, 0, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, SWP_SHOWWINDOW);
+			return s;
+		}
+
+		inline ATOM Register_Custom()
+		{
+			auto WndProc = [](HWND hh, UINT mm, WPARAM ww, LPARAM ll) -> LRESULT
+			{
+				UWPCONTROL* s = (UWPCONTROL*)GetProp(hh, L"s");
+				switch (mm)
+				{
+				case UWPM_GET_CONTROL:
+				{
+					return (LRESULT)s;
+				}
+				case WM_SETTEXT:
+				{
+					GenericDestroy(hh);
+					HWND hP = GetParent(hh);
+					s = GenericCreate(hP, hh, (LPVOID)ll);
+					if (!s)
+						return 0;
+					return 1;
+				}
+				case WM_DESTROY:
+				{
+					GenericDestroy(hh);
+					break;
+				}
+				case WM_CREATE:
+				{
+					return 0;
+				}
+				}
+				return DefWindowProc(hh, mm, ww, ll);
+			};
+
+			WNDCLASSEXW wC = { 0 };
+			wC.cbSize = sizeof(wC);
+			wC.style = CS_GLOBALCLASS | CS_DBLCLKS;
+			wC.lpfnWndProc = WndProc;
+			wC.hInstance = GetModuleHandle(0);
+			wC.lpszClassName = L"UWP_Custom";
+			return RegisterClassExW(&wC);
+		}
+
+		inline void Register()
+		{
+			Register_Custom();
+		}
+
+	}
+
+
 	struct AUTH
 	{
 		std::string id;

@@ -5510,6 +5510,8 @@ namespace RGF
 
 			virtual HRESULT Upload2(bool Resumable, HANDLE hX, const char * arr,unsigned long long arrs, const char* folderid, const char* filename, string & resumedata, string & returndata, std::function<HRESULT(unsigned long long f, unsigned long long t, void* lp)> fx, void* lp)
 			{
+				if (arrs > (3 * 1024 * 1024))
+					return UploadLong(arr, arrs, folderid, filename, resumedata, returndata, fx, lp);
 				UNREFERENCED_PARAMETER(resumedata);
 				UNREFERENCED_PARAMETER(Resumable);
 				if (FAILED(Connect(L"graph.microsoft.com", true, 443, INTERNET_FLAG_SECURE)))
@@ -5529,6 +5531,68 @@ namespace RGF
 				auto hi = arr ? RequestWithBuffer(re.c_str(), L"PUT", { h1,h3 }, arr,(size_t) arrs, fx, lp) : RequestWithFile(re.c_str(), L"PUT", { h1,h3 }, hX, fx, lp);
 				returndata = jsonreturn(hi);
 				return S_OK;
+			}
+			virtual HRESULT UploadLong(const char* arr, unsigned long long arrs, const char* folderid, const char* filename, string& resumedata, string& returndata, std::function<HRESULT(unsigned long long f, unsigned long long t, void* lp)> fx, void* lp)
+			{
+				try
+				{
+					if (FAILED(Connect(L"graph.microsoft.com", true, 443, INTERNET_FLAG_SECURE)))
+						return E_FAIL;
+					wstring h1 = L"Authorization: Bearer ";
+					h1 += access_token;
+
+					ystring re;
+
+					// The following one won't work, but it should
+					re.Format(L"/v1.0/me/drive/items/%S/createUploadSession", folderid);
+
+					ystring jsn;
+					jsn.Format(L"{	\"item\": {	\"@odata.type\": \"microsoft.graph.driveItemUploadableProperties\",	\"@microsoft.graph.conflictBehavior\" : \"rename\", \"name\" : \"%S\" }}", filename);
+				//	const char* aa = jsn.a_str();
+					auto hi1 = RequestWithBuffer(re.c_str(), L"POST", { h1,L"Content-type: application/json" }, 0,0);
+//					auto hi1 = RequestWithBuffer(re.c_str(), L"POST", { h1,L"Content-type: application/json" }, aa, (size_t)strlen(aa));
+					auto r1 = jsonreturn(hi1);
+					jsonxx::Object o1;
+					o1.parse(r1);
+					ystring uurl = o1.get<jsonxx::String>("uploadUrl");
+
+					unsigned long long step = 327680;
+					for (unsigned long long ii = 0; ii < arrs; ii += step)
+					{
+						auto mx = arrs - ii;
+						if (mx > step)
+							mx = step;
+
+						ystring h2;
+						h2.Format(L"Content-Length: %llu", mx);
+						ystring h3;
+						h3.Format(L"Content-Range: bytes %llu-%llu/%llu", ii,ii + mx - 1,arrs);
+
+						auto hi2 = RequestWithBuffer(uurl.c_str(), L"PUT", { h1,h2,h3 }, arr + ii,(size_t) mx);
+						auto r2 = jsonreturn(hi2);
+						jsonxx::Object o2;
+						o2.parse(r2);
+
+						if (fx)
+						{
+							auto hr = fx(ii, arrs, lp);
+							if (FAILED(hr))
+							{
+								// Destroy upload session
+								RequestWithBuffer(uurl.c_str(), L"DELETE", { h1 }, 0,0);
+								break;
+							}
+						}
+					}
+
+					return S_OK;
+
+				}
+				catch (...)
+				{
+					return E_FAIL;
+				}
+
 			}
 
 

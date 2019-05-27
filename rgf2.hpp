@@ -198,6 +198,7 @@ namespace RGF
 		std::string secret;
 		std::vector<std::string> tokens; // must be 3
 		std::string root; // ID form
+		std::string cd;
 
 	};
 
@@ -786,6 +787,8 @@ namespace RGF
 									}
 
 									auto pr = s->s->onedrive.root;
+									s->s->onedrive.cd += GOD::ystring(sp.FindName(L"foo1").as<TextBlock>().Text().c_str()).a_str();
+									s->s->onedrive.cd += "\\";
 									s->s->onedrive.root = GOD::ystring(sp.FindName(L"foo2").as<TextBlock>().Text().c_str()).a_str();
 									Top.FindName(L"oneWaiting").as<StackPanel>().Visibility(Visibility::Visible);
 									Top.FindName(L"oneDone").as<StackPanel>().Visibility(Visibility::Collapsed);
@@ -918,6 +921,7 @@ namespace RGF
 						lv.Items().Clear();
 						INSAVE* s = (INSAVE*)winrt::unbox_value<unsigned long long>(Top.Tag());
 						s->s->onedrive.root = s->s->one->GetRootFolderID();
+						s->s->onedrive.cd = "";
 						std::thread t(OneThreadLoad, s, "/", s->s->onedrive.root);
 						t.detach();
 					});
@@ -1130,11 +1134,9 @@ namespace RGF
 							//							std::function<HRESULT(unsigned long long f, unsigned long long t, void* lp)>
 							std::string ret;
 
-							///virtual HRESULT Upload(bool Resumable, HANDLE hX, vector<char>* arr, const char* folderid, const char* filename, string& resumedata, string& returndata, std::function<HRESULT(unsigned long long f, unsigned long long t, void* lp)> fx, void* lp)
-								//
 							std::string rd;
 
-							auto hr = s->s->one->Upload2(0, 0,s->s->d, s->s->sz, s->s->onedrive.root.c_str(), fi.a_str(),rd, ret,
+							auto hr = s->s->one->Upload2(0,0,s->s->d, s->s->sz, s->s->onedrive.root.c_str(), fi.a_str(),rd, ret,
 								[](unsigned long long f, unsigned long long t, void* lp) -> HRESULT
 								{
 									INSAVE* s = (INSAVE*)lp;

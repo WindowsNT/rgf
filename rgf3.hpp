@@ -121,7 +121,7 @@ namespace RGF
 							r->read->resize((size_t)li.QuadPart);
 							// Read once
 							DWORD a = 0;
-							ReadFile(hX, r->read->data(), r->read->size(), &a, 0);
+							ReadFile(hX, r->read->data(), (DWORD)r->read->size(), &a, 0);
 							if (a == r->read->size())
 								r->rs = S_OK;
 
@@ -160,11 +160,10 @@ namespace RGF
 
 	void GoogleThreadLoad(RGBF* r, GOD::ystring NewName, std::string NewID,HWND hh)
 	{
-
 		// We have data
 		std::vector<std::tuple<std::string, std::string, std::string>> AllItems;
 		std::string j = r->goo->dir(r->google.root.c_str(), true, r->func == 0 ? true : false);
-		RGF::EnumNames(*r->goo, j, &AllItems, 1, !r->func);
+		RGF::GOD::EnumNames(*r->goo, j, &AllItems, 1, !r->func);
 		SendMessage(hh, WM_USER + 501, (WPARAM)& NewName, (LPARAM)& AllItems);
 	};
 
@@ -189,13 +188,17 @@ namespace RGF
 			DWORD LEST = LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_FULLROWSELECT;
 			ListView_SetExtendedListViewStyle(hL, LEST);
 			ListInsertColumn(hL, 0, LVCF_SUBITEM | LVCF_TEXT | LVCF_WIDTH, 0, 30, L"Name", 0, 0, 0, 0);
-			ListInsertColumn(hL, 1, LVCF_SUBITEM | LVCF_TEXT | LVCF_WIDTH, 0, 5, L"ID", 0, 0, 0, 0);
+			ListInsertColumn(hL, 1, LVCF_SUBITEM | LVCF_TEXT | LVCF_WIDTH, 0, 0, L"ID", 0, 0, 0, 0);
+			ListInsertColumn(hL, 2, LVCF_SUBITEM | LVCF_TEXT | LVCF_WIDTH, 0, 0, L"MIME", 0, 0, 0, 0);
 
 			ShowWindow(GetDlgItem(hh, 701), SW_SHOW);
 			ShowWindow(GetDlgItem(hh, 801), SW_SHOW);
 			ShowWindow(GetDlgItem(hh, 901), SW_HIDE);
 			ShowWindow(GetDlgItem(hh, 101), SW_HIDE);
 			ShowWindow(GetDlgItem(hh, 202), SW_HIDE);
+			ShowWindow(GetDlgItem(hh, 211), SW_HIDE);
+			ShowWindow(GetDlgItem(hh, 212), SW_HIDE);
+			ShowWindow(GetDlgItem(hh, 213), SW_HIDE);
 
 			auto ty1 = r->google.id.c_str();
 			auto ty2 = r->google.secret.c_str();
@@ -219,9 +222,66 @@ namespace RGF
 
 			return true;
 		}
+		case WM_NOTIFY:
+		{
+			NMHDR* n = (NMHDR*)ll;
+			if (n->hwndFrom == hL && n->code == NM_DBLCLK)
+			{
+				int L = ListView_GetNextItem(hL, -1, LVIS_SELECTED);
+				if (L == -1)
+					return 0;
+
+				std::vector<wchar_t> t1(1000);
+				std::vector<wchar_t> t2(1000);
+				std::vector<wchar_t> t3(1000);
+				ListView_GetItemText(hL, L, 0, t1.data(), 1000);
+				ListView_GetItemText(hL, L, 1, t2.data(), 1000);
+				ListView_GetItemText(hL, L, 2, t3.data(), 1000);
+				if (_wcsicmp(t3.data(), L"application/vnd.google-apps.folder") == 0)
+				{
+					// Enter 
+					auto pr = r->onedrive.root;
+					r->google.cd += GOD::ystring(t1.data()).a_str();
+					r->google.cd += "\\";
+					r->google.root = GOD::ystring(t2.data()).a_str();
+					ShowWindow(GetDlgItem(hh, 701), SW_SHOW);
+					ShowWindow(GetDlgItem(hh, 801), SW_SHOW);
+					ShowWindow(GetDlgItem(hh, 901), SW_HIDE);
+					ShowWindow(GetDlgItem(hh, 101), SW_HIDE);
+					ShowWindow(GetDlgItem(hh, 202), SW_HIDE);
+					ShowWindow(GetDlgItem(hh, 211), SW_HIDE);
+					ShowWindow(GetDlgItem(hh, 212), SW_HIDE);
+					ShowWindow(GetDlgItem(hh, 213), SW_HIDE);
+					ListView_DeleteAllItems(hL);
+
+					GOD::ystring NewName = GOD::ystring(t1.data()).a_str();
+					std::string NewID = GOD::ystring(t2.data()).a_str();
+					std::thread t(GoogleThreadLoad, r, NewName, NewID,hh);
+					t.detach();
+
+				}
+			}
+
+			return 0;
+		}
 		case WM_COMMAND:
 		{
 			int LW = LOWORD(ww);
+			if (LW == 211)
+			{
+				// Top
+				ShowWindow(GetDlgItem(hh, 701), SW_SHOW);
+				ShowWindow(GetDlgItem(hh, 801), SW_SHOW);
+				ShowWindow(GetDlgItem(hh, 901), SW_HIDE);
+				ShowWindow(GetDlgItem(hh, 101), SW_HIDE);
+				ShowWindow(GetDlgItem(hh, 202), SW_HIDE);
+				ShowWindow(GetDlgItem(hh, 211), SW_HIDE);
+				ShowWindow(GetDlgItem(hh, 212), SW_HIDE);
+				ShowWindow(GetDlgItem(hh, 213), SW_HIDE);
+				r->google.root = r->goo->GetRootFolderID();
+				std::thread t(GoogleThreadLoad, r, "root", "root",hh);
+				t.detach();
+			}
 			return 0;
 		}
 
@@ -236,6 +296,9 @@ namespace RGF
 			ShowWindow(GetDlgItem(hh, 901), SW_SHOW);
 			ShowWindow(GetDlgItem(hh, 101), SW_SHOW);
 			ShowWindow(GetDlgItem(hh, 202), SW_SHOW);
+			ShowWindow(GetDlgItem(hh, 211), SW_SHOW);
+			ShowWindow(GetDlgItem(hh, 212), SW_SHOW);
+			ShowWindow(GetDlgItem(hh, 213), SW_SHOW);
 
 			if (r->func == 0)
 			{
@@ -268,6 +331,7 @@ namespace RGF
 					int L = ListView_InsertItem(hL, &lv);
 
 					ListView_SetItemText(hL, L, 1,(LPWSTR) y2.c_str());
+					ListView_SetItemText(hL, L, 2,(LPWSTR)mi.c_str());
 
 				}
 				else
@@ -275,7 +339,6 @@ namespace RGF
 				}
 
 				AutoSizeLVColumn(hL, 0);
-			//	AutoSizeLVColumn(hL, 1);
 			}
 
 			SendMessage(hh, WM_SIZE, 0, 0);
@@ -369,7 +432,7 @@ namespace RGF
 		hdr.dwFlags = PSH_PROPSHEETPAGE;
 		hdr.hwndParent = s.hParent;
 		hdr.hInstance = 0;
-		hdr.nPages = Pages.size();
+		hdr.nPages = (UINT)Pages.size();
 		hdr.nStartPage = 0;
 		hdr.ppsp = Pages.data();
 		hdr.pszCaption = L"Save as...";

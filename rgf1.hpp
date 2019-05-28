@@ -4758,14 +4758,17 @@ namespace RGF
 		};
 
 
+		class OAUTH2 : public REST
+		{
+
+		};
 
 	}
 
 
+
 	namespace GOD
 	{
-
-
 		template <int MR = 1>
 		class TEVENT
 		{

@@ -46,7 +46,7 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	std::vector<char> d(1024 * 1024 * 3);
 	RGF::RGBF s;
 	s.d = d.data();
-	s.sz = d.size();
+	s.sz = (DWORD)d.size();
 	s.resultFile = L"r:\\1.dat";
 	s.DefExt = L"dat";
 
@@ -65,6 +65,7 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	// load tokens if we have them
 	s.google.tokens.resize(3);
 	s.onedrive.tokens.resize(3);
+	s.db.tokens.resize(3);
 	s.google.id = rr.GetRootElement()["tokens"]["google"].vv("u").GetValue();
 	s.google.secret = rr.GetRootElement()["tokens"]["google"].vv("p").GetValue();
 	s.onedrive.id = rr.GetRootElement()["tokens"]["onedrive"].vv("u").GetValue();
@@ -74,6 +75,11 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	s.google.tokens[1] = rr.GetRootElement()["tokens"]["google"].vv("t2").GetValue();
 	s.onedrive.tokens[0] = rr.GetRootElement()["tokens"]["onedrive"].vv("t1").GetValue();
 	s.onedrive.tokens[1] = rr.GetRootElement()["tokens"]["onedrive"].vv("t2").GetValue();
+
+	s.db.id = rr.GetRootElement()["tokens"]["dropbox"].vv("u").GetValue();
+	s.db.secret = rr.GetRootElement()["tokens"]["dropbox"].vv("p").GetValue();
+	s.db.tokens[0] = rr.GetRootElement()["tokens"]["dropbox"].vv("t1").GetValue();
+	s.db.tokens[1] = rr.GetRootElement()["tokens"]["dropbox"].vv("t2").GetValue();
 
 
 	auto rv = RGF::Save(s);
@@ -88,6 +94,11 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	{
 		rr.GetRootElement()["tokens"]["onedrive"].vv("t1").SetValue(s.onedrive.tokens[0].c_str());
 		rr.GetRootElement()["tokens"]["onedrive"].vv("t2").SetValue(s.onedrive.tokens[1].c_str());
+	}
+	if (s.db.tokens.size() == 3)
+	{
+		rr.GetRootElement()["tokens"]["dropbox"].vv("t1").SetValue(s.db.tokens[0].c_str());
+		rr.GetRootElement()["tokens"]["dropbox"].vv("t2").SetValue(s.db.tokens[1].c_str());
 	}
 	rr.Save();
 

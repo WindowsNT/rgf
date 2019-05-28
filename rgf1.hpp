@@ -5174,7 +5174,30 @@ namespace RGF
 
 				auto id = js.get<jsonxx::String>("id");
 
-				if (AT == 2)
+				// ".tag": "folder"
+				if (AT == 3)
+				{
+					bool Fold = false;
+					if (js.get<jsonxx::String>(".tag") == string("folder"))
+						Fold = true;
+					if (DirOnly)
+					{
+						if (Fold)
+						{
+							auto tu = make_tuple<string, string, string>(move(id), move(titl), move("application/vnd.google-apps.folder"));
+							if (all)
+								all->push_back(tu);
+						}
+					}
+					else
+					{
+						auto tu = make_tuple<string, string, string>(move(id), move(titl), move(Fold ? "application/vnd.google-apps.folder" : ""));
+						if (all)
+							all->push_back(tu);
+					}
+				}
+				else
+					if (AT == 2)
 				{
 					bool Fold = false;
 					if (js.has<jsonxx::Object>("folder"))
@@ -6364,6 +6387,7 @@ namespace RGF
 				return ContinueResumable(hX, arr, folderid, filename, returndata, resumedata, fx, lp);
 			}
 
+
 			virtual HRESULT Upload(bool Resumable, HANDLE hX, vector<char> * arr, const char* folderid, const char* filename, string & resumedata, string & returndata, std::function<HRESULT(unsigned long long f, unsigned long long t, void* lp)> fx = 0, void* lp = 0)
 			{
 				if (Resumable)
@@ -6499,8 +6523,8 @@ namespace RGF
 			virtual int Auth(vector<string>& toks)
 			{
 				toks.resize(3);
-				access_token = toks[2];
-				code = toks[0];
+				access_token = toks[0];
+				code = toks[2];
 				if (access_token.empty())
 				{
 					if (code.empty())
@@ -6508,11 +6532,11 @@ namespace RGF
 						GetCode();
 						if (code.empty())
 							return 0;
-						toks[0] = code;
+						toks[2] = code;
 						GetAccessToken();
 						if (access_token.empty())
 							return 0;
-						toks[2] = access_token;
+						toks[0] = access_token;
 					}
 					return 2;
 				}
@@ -6530,6 +6554,8 @@ namespace RGF
 
 				string dk;
 				dk += "{\r\n\"path\": \"";
+				if (pid == 0 || strlen(pid) == 0)
+					dk += "\\";
 				dk += fn;
 				dk += "\"\r\n}";
 
@@ -6539,7 +6565,7 @@ namespace RGF
 
 			virtual string GetRootFolderID()
 			{
-				return "/";
+				return "";
 			}
 			virtual string IDFromPath(const char* Path, bool CreateIfNotExists = false)
 			{
@@ -6584,7 +6610,7 @@ namespace RGF
 				if (FAILED(Connect(L"api.dropboxapi.com", true)))
 					return false;
 				string pr = IsRDir ? Path : IDFromPath(Path);
-				if (pr.empty())
+				if (pr.empty() && strlen(Path) > 0)
 					return "";
 
 				ystring re = "/2/files/list_folder";
@@ -6686,7 +6712,7 @@ namespace RGF
 				return hr;
 			}
 
-			virtual HRESULT Upload(bool Resumable, HANDLE hX, vector<char> * arr, const char* folderid, const char* filename, string & resumedata, string & returndata, std::function<HRESULT(unsigned long long f, unsigned long long t, void* lp)> fx = 0, void* lp = 0)
+			virtual HRESULT Upload2(bool Resumable, HANDLE hX, const char* arr, size_t arrs, const char* folderid, const char* filename, string& resumedata, string& returndata, std::function<HRESULT(unsigned long long f, unsigned long long t, void* lp)> fx = 0, void* lp = 0)
 			{
 				UNREFERENCED_PARAMETER(Resumable);
 				UNREFERENCED_PARAMETER(resumedata);
@@ -6705,7 +6731,7 @@ namespace RGF
 				ystring h4;
 				unsigned long long sz = 0;
 				if (arr)
-					sz = arr->size();
+					sz = arrs;
 				else
 				{
 					LARGE_INTEGER li;
@@ -6716,7 +6742,7 @@ namespace RGF
 
 				ihandle hi;
 				if (arr)
-					hi = RequestWithBuffer(re.c_str(), L"POST", { h1,h2,h3,h4 }, arr->data(), arr->size(), fx, lp);
+					hi = RequestWithBuffer(re.c_str(), L"POST", { h1,h2,h3,h4 }, arr, arrs, fx, lp);
 				else
 					hi = RequestWithFile(re.c_str(), L"POST", { h1,h2,h3,h4 }, hX, fx, lp);
 				auto et = jsonreturn(hi);
@@ -6725,6 +6751,12 @@ namespace RGF
 					return E_FAIL;
 				returndata = et;
 				return S_OK;
+
+			}
+
+			virtual HRESULT Upload(bool Resumable, HANDLE hX, vector<char> * arr, const char* folderid, const char* filename, string & resumedata, string & returndata, std::function<HRESULT(unsigned long long f, unsigned long long t, void* lp)> fx = 0, void* lp = 0)
+			{
+				return Upload2(Resumable, hX, arr ? arr->data() : 0, arr ? arr->size() : 0, folderid, filename, resumedata, returndata, fx, lp);
 			}
 
 			virtual string Delete(const char* rp, const char* fid, bool Trash = false)
@@ -6925,7 +6957,38 @@ namespace RGF
 
 
     </PivotItem>
-    <PivotItem Header="DropBox" x:Name="name_db">
+    <PivotItem Header="Dropbox" x:Name="name_db">
+
+
+		<StackPanel>
+			<StackPanel Orientation="Vertical" Margin="30" x:Name="dbWaiting">
+				<TextBlock Margin="20" Text="Please wait while loading folders..." />
+				<ProgressRing IsActive="true" MinWidth="100" MinHeight="100"  />
+			</StackPanel>
+			<StackPanel Orientation="Horizontal" Margin="0,30,0,0" x:Name="dbDone" Visibility="Collapsed" >
+
+				<StackPanel Orientation="Vertical" Margin="0,0,20,0">
+						<AppBarButton Icon="Up" Label="Top" x:Name="dbTop" Width="150"/>						<AppBarButton Icon="NewFolder" Label="New folder" x:Name="dbNF" Width="150"/>						<AppBarButton Icon="Import" Label="Logout" x:Name="dbLogout" Width="150"/>				</StackPanel>
+
+
+				<StackPanel Orientation="Vertical" >
+					<TextBlock Margin="5" Text="Select a folder, then type a file name:" x:Name="dbHelp1"/>
+					<StackPanel Orientation="Horizontal" >
+					<TextBox x:Name="dbFile"
+							 PlaceholderText="Filename"
+							 Width="300" HorizontalAlignment="Left"/>
+						<Button x:Name="dbSave" Margin="10,0,0,0" >Save to root</Button>
+					</StackPanel>
+
+					  <Grid>						<Grid.ColumnDefinitions>						  <ColumnDefinition Width="Auto" x:Name="ColDef1" />						</Grid.ColumnDefinitions>						<Grid.RowDefinitions>						  <RowDefinition Height="Auto" x:Name="RowDef1" />						</Grid.RowDefinitions>						<ListView Grid.Row="0"  Grid.Column="0" CanDragItems="True" x:Name="dbList" SelectionMode="Extended" ScrollViewer.VerticalScrollBarVisibility="Visible" />					  </Grid>				</StackPanel>
+
+ 
+
+
+			</StackPanel>
+		</StackPanel>
+
+
     </PivotItem>
 </Pivot>
 		</StackPanel>

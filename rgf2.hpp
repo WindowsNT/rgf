@@ -215,6 +215,15 @@ namespace RGF
 		SendMessage(s->hh, WM_USER + 502, (WPARAM)& NewName, (LPARAM)& AllItems);
 	}
 
+	void DropThreadLoad(INSAVE* s, GOD::ystring NewName, std::string NewID)
+	{
+		// We have data
+		std::vector<std::tuple<std::string, std::string, std::string>> AllItems;
+		std::string j = s->s->drop->dir(s->s->db.root.c_str(), true, true);
+		EnumNames(*s->s->drop, j, &AllItems, 3, !s->s->func);
+		SendMessage(s->hh, WM_USER + 503, (WPARAM)& NewName, (LPARAM)& AllItems);
+	}
+
 #define TopView StackPanel
 
 	using namespace winrt::Windows::UI;
@@ -264,7 +273,7 @@ namespace RGF
 			auto Top = u->ins.as<TopView>();
 			auto Prg = Top.FindName(L"runBar").as<ProgressBar>();
 			//				INSAVE* s = (INSAVE*)winrt::unbox_value<unsigned long long>(Top.Tag());
-			Prg.Value(ww);
+			Prg.Value((double)ww);
 			return 0;
 		}
 
@@ -394,6 +403,69 @@ namespace RGF
 			return 0;
 		}
 
+
+		case WM_USER + 503:
+		{
+			// Fill DB Items
+			// ll = &vector<tuple<string,string>>
+			// ww = &string current root
+			auto Top = u->ins.as<TopView>();
+			Top.FindName(L"dbWaiting").as<StackPanel>().Visibility(Visibility::Collapsed);
+			Top.FindName(L"dbDone").as<StackPanel>().Visibility(Visibility::Visible);
+
+			if (s->s->func == 0)
+			{
+				GOD::ystring y;
+				GOD::ystring curr = *(GOD::ystring*)ww;
+				y.Format(L"Save to %s", curr.c_str());
+				Top.FindName(L"dbSave").as<Button>().Content(winrt::box_value(y.c_str()));
+			}
+
+			auto lv = Top.FindName(L"dbList").as<ListView>();
+			std::vector<std::tuple<std::string, std::string, std::string>>* vx = (std::vector<std::tuple<std::string, std::string, std::string>>*)ll;
+
+
+			for (auto& a : *vx)
+			{
+				GOD::ystring y1 = std::get<1>(a);
+				GOD::ystring y2 = std::get<0>(a);
+				GOD::ystring sp;
+
+				GOD::ystring mi = std::get<2>(a);
+				if (mi == L"application/vnd.google-apps.folder")
+					sp = GOD::ystring().Format(
+						LR"(
+						<StackPanel xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+								Orientation="Vertical" x:Name="foo">
+							<TextBlock  Text="%s" x:Name="foo1" Foreground="Blue">
+							</TextBlock>
+							<TextBlock Visibility="Collapsed" Text="%s" x:Name="foo2" />
+							<TextBlock Visibility="Collapsed" Text="%s" x:Name="foo3" />
+						</StackPanel>
+
+						)", (wchar_t*)y1.c_str(), (wchar_t*)y2.c_str(), (wchar_t*)mi.c_str());
+				else
+					sp = GOD::ystring().Format(
+						LR"(
+						<StackPanel xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+								Orientation="Vertical" x:Name="foo">
+							<TextBlock  Text="%s" x:Name="foo1" Foreground="Black">
+							</TextBlock>
+							<TextBlock Visibility="Collapsed" Text="%s" x:Name="foo2" />
+							<TextBlock Visibility="Collapsed" Text="%s" x:Name="foo3" />
+						</StackPanel>
+
+						)", (wchar_t*)y1.c_str(), (wchar_t*)y2.c_str(), (wchar_t*)mi.c_str());
+
+				using namespace winrt::Windows::UI::Xaml::Markup;
+				auto ins2 = XamlReader::Load(sp.c_str());
+
+				lv.Items().Append(ins2);
+			}
+
+			SendMessage(hh, WM_SIZE, 0, 0);
+			return 0;
+		}
 
 
 		case WM_INITDIALOG:
@@ -528,7 +600,7 @@ namespace RGF
 							s->s->read->resize((size_t)li.QuadPart);
 							// Read once
 							DWORD a = 0;
-							ReadFile(hX, s->s->read->data(), s->s->read->size(), &a, 0);
+							ReadFile(hX, s->s->read->data(),(DWORD) s->s->read->size(), &a, 0);
 							if (a == s->s->read->size())
 								s->s->rs = S_OK;
 
@@ -556,6 +628,105 @@ namespace RGF
 					auto Top = u->ins.as<TopView>();
 					INSAVE* s = (INSAVE*)winrt::unbox_value<unsigned long long>(Top.Tag());
 					int idx = Top.FindName(L"pi").as<Pivot>().SelectedIndex();
+
+					if (idx == 3)
+					{
+						// DropBox
+						if (!s->s->drop)
+						{
+							auto ty1 = s->s->db.id.c_str();
+							auto ty2 = s->s->db.secret.c_str();
+							s->s->drop = std::make_shared<RGF::GOD::DROPBOX>(ty1, ty2);
+							s->s->db.tokens.resize(3);
+							int vrf = s->s->drop->Auth(s->s->db.tokens);
+							if (vrf == 2)
+								vrf = s->s->drop->Auth(s->s->db.tokens);
+							s->s->db.root = s->s->drop->GetRootFolderID();
+
+							// Test
+							//s->s->drop->IDFromPath("BACKUPS\\TP2");
+
+							auto lv = Top.FindName(L"dbList").as<ListView>();
+							lv.IsDoubleTapEnabled(true);
+							lv.DoubleTapped([](const IInspectable& sender, const RoutedEventArgs& drg)
+								{
+									auto Top = u->ins.as<TopView>();
+									INSAVE* s = (INSAVE*)winrt::unbox_value<unsigned long long>(Top.Tag());
+									auto lv = sender.as<ListView>();
+									auto sp = lv.SelectedItem().as<StackPanel>();
+									auto pi = sp.FindName(L"foo1").as<TextBlock>();
+									GOD::ystring fi = pi.Text().c_str();
+
+									GOD::ystring mim = GOD::ystring(sp.FindName(L"foo3").as<TextBlock>().Text().c_str()).a_str();
+									if (mim != L"application/vnd.google-apps.folder")
+									{
+										// Download this file
+
+										// Hide Pivot
+										Top.FindName(L"pi").as<Pivot>().Visibility(Visibility::Collapsed);
+										Top.FindName(L"run").as<StackPanel>().Visibility(Visibility::Visible);
+
+										//										virtual HRESULT Download(const char* fid, HANDLE hF, vector<char>* arr, unsigned long long from = 0, unsigned long long to = (unsigned long long) - 1, std::function<HRESULT(unsigned long long, unsigned long long, void*)> fx = 0, void* lp = 0)
+																					//
+
+										s->s->rs = S_OK;
+										GOD::ystring fid = GOD::ystring(sp.FindName(L"foo2").as<TextBlock>().Text().c_str()).a_str();
+										s->s->resultFile = fid;
+
+										if (s->s->read)
+										{
+											auto foo = [](GOD::ystring fid, INSAVE* s)
+											{
+												auto hr = s->s->drop->Download(fid.a_str(), 0, s->s->read, 0, (unsigned long long) - 1, [](unsigned long long f, unsigned long long t, void* lp) -> HRESULT
+													{
+														INSAVE* s = (INSAVE*)lp;
+														f *= 100;
+														f = (int)(f / t);
+														SendMessage(s->hh, WM_USER + 500, (WPARAM)f, 0);
+														if (s->ShouldCancel)
+															return E_FAIL;
+														return S_OK;
+													}, s);
+												s->s->rs = hr;
+												SendMessage(s->hh, WM_CLOSE, 0, 0);
+											};
+
+											std::thread tx(foo, fid, s);
+											tx.detach();
+											return;
+										}
+										SendMessage(s->hh, WM_CLOSE, 0, 0);
+										return;
+
+									}
+
+									auto pr = s->s->db.root;
+									s->s->db.cd += GOD::ystring(sp.FindName(L"foo1").as<TextBlock>().Text().c_str()).a_str();
+									s->s->db.cd += "\\";
+									s->s->db.root = GOD::ystring(sp.FindName(L"foo2").as<TextBlock>().Text().c_str()).a_str();
+									Top.FindName(L"dbWaiting").as<StackPanel>().Visibility(Visibility::Visible);
+									Top.FindName(L"dbDone").as<StackPanel>().Visibility(Visibility::Collapsed);
+									lv.Items().Clear();
+
+									std::thread t(DropThreadLoad, s, fi.asc_str(), s->s->db.root);
+									t.detach();
+
+								});
+
+							// Remove the ring
+							if (vrf >= 1)
+							{
+								auto rid = s->s->drop->GetRootFolderID();
+								std::thread t(DropThreadLoad, s, "/", rid.c_str());
+								t.detach();
+
+							}
+							else
+								Top.FindName(L"dbWaiting").as<StackPanel>().Visibility(Visibility::Collapsed);
+						}
+					}
+
+
 					if (idx == 2)
 					{
 						// OneDrive
@@ -752,6 +923,22 @@ namespace RGF
 
 				});
 
+
+				Top.FindName(L"dbTop").as<AppBarButton>().Click([](const IInspectable& ins, const RoutedEventArgs& r)
+					{
+						auto Top = u->ins.as<TopView>();
+
+						Top.FindName(L"dbWaiting").as<StackPanel>().Visibility(Visibility::Visible);
+						Top.FindName(L"dbDone").as<StackPanel>().Visibility(Visibility::Collapsed);
+
+						auto lv = Top.FindName(L"dbList").as<ListView>();
+						lv.Items().Clear();
+						INSAVE* s = (INSAVE*)winrt::unbox_value<unsigned long long>(Top.Tag());
+						s->s->db.root = s->s->drop->GetRootFolderID();
+						std::thread t(DropThreadLoad, s, "/",s->s->db.root);
+						t.detach();
+					});
+
 				Top.FindName(L"oneTop").as<AppBarButton>().Click([](const IInspectable& ins, const RoutedEventArgs& r)
 					{
 						auto Top = u->ins.as<TopView>();
@@ -890,6 +1077,47 @@ namespace RGF
 
 				});
 
+			Top.FindName(L"dbNF").as<AppBarButton>().Click([](const IInspectable& ins, const RoutedEventArgs& r)
+				{
+					auto Top = u->ins.as<TopView>();
+					//INSAVE* s = (INSAVE*)winrt::unbox_value<unsigned long long>(Top.Tag());
+
+					auto dlg = Top.FindName(L"goo_NF").as<ContentDialog>();
+					auto apo = dlg.ShowAsync();
+
+					auto bok = dlg.FindName(L"gf_OK").as<Button>();
+					bok.Click([](const IInspectable& ins, const RoutedEventArgs& r)
+						{
+							auto Top = u->ins.as<TopView>();
+							GOD::ystring url = Top.FindName(L"gfname").as<TextBox>().Text().c_str();
+							INSAVE* s = (INSAVE*)winrt::unbox_value<unsigned long long>(Top.Tag());
+							auto dlg = Top.FindName(L"goo_NF").as<ContentDialog>();
+							dlg.Hide();
+
+							auto jsx = s->s->drop->CreateFolder(url.a_str(), s->s->db.root.c_str());
+
+							Top.FindName(L"dbWaiting").as<StackPanel>().Visibility(Visibility::Visible);
+							Top.FindName(L"dbDone").as<StackPanel>().Visibility(Visibility::Collapsed);
+							auto lv = Top.FindName(L"dbList").as<ListView>();
+							lv.Items().Clear();
+							std::thread t(DropThreadLoad, s, url, s->s->db.root);
+							t.detach();
+
+
+						});
+					auto bca = dlg.FindName(L"gf_Cancel").as<Button>();
+					bca.Click([](const IInspectable& ins, const RoutedEventArgs& r)
+						{
+							auto Top = u->ins.as<TopView>();
+							//INSAVE* s = (INSAVE*)winrt::unbox_value<unsigned long long>(Top.Tag());
+							auto dlg = Top.FindName(L"goo_NF").as<ContentDialog>();
+							dlg.Hide();
+						});
+
+
+
+
+				});
 
 			if (s->s->func == 0)
 				Top.FindName(L"googleSave").as<Button>().Click([](const IInspectable & ins, const RoutedEventArgs & r)
@@ -1002,6 +1230,63 @@ namespace RGF
 					});
 
 
+			if (s->s->func == 0)
+				Top.FindName(L"dbSave").as<Button>().Click([](const IInspectable& ins, const RoutedEventArgs& r)
+					{
+						auto Top = u->ins.as<TopView>();
+						INSAVE* s = (INSAVE*)winrt::unbox_value<unsigned long long>(Top.Tag());
+						auto localFile = Top.FindName(L"dbFile").as<TextBox>();
+						GOD::ystring fi = localFile.Text().c_str();
+
+						if (fi.empty())
+							return;
+
+						// Hide Pivot
+						Top.FindName(L"pi").as<Pivot>().Visibility(Visibility::Collapsed);
+						Top.FindName(L"run").as<StackPanel>().Visibility(Visibility::Visible);
+
+
+						if (wcschr(fi.c_str(), L'.') == 0)
+						{
+							if (s->s->DefExt.length())
+							{
+								fi += L".";
+								fi += s->s->DefExt;
+							}
+						}
+
+						// We upload to db
+						auto up = [](GOD::ystring fi, INSAVE* s)
+						{
+							//							std::function<HRESULT(unsigned long long f, unsigned long long t, void* lp)>
+							std::string ret;
+
+							std::string rd;
+
+							// virtual HRESULT Upload(bool Resumable, HANDLE hX, vector<char>* arr, const char* folderid, const char* filename, string& resumedata, string& returndata, std::function<HRESULT(unsigned long long f, unsigned long long t, void* lp)> fx = 0, void* lp = 0)
+								
+							auto hr = s->s->drop->Upload2(0,0, s->s->d, s->s->sz, s->s->db.root.c_str(), fi.a_str(), rd, ret,
+								[](unsigned long long f, unsigned long long t, void* lp) -> HRESULT
+								{
+									INSAVE* s = (INSAVE*)lp;
+									f *= 100;
+									f = (int)(f / t);
+									SendMessage(s->hh, WM_USER + 500, f, 0);
+									if (s->ShouldCancel)
+										return E_FAIL;
+									return S_OK;
+								}
+							, s);
+							s->s->rs = hr;
+							if (SUCCEEDED(hr))
+								s->s->resultFile = ret;
+							SendMessage(s->hh, WM_CLOSE, 0, 0);
+
+						};
+
+						std::thread t(up, fi, s);
+						t.detach();
+					});
 
 
 			Top.FindName(L"runCancel").as<Button>().Click([](const IInspectable & ins, const RoutedEventArgs & r)

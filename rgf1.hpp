@@ -4197,6 +4197,230 @@ namespace RGF
 
 	// REST and GOD
 
+	namespace GOD
+	{
+		template <int MR = 1>
+		class TEVENT
+		{
+		public:
+			HANDLE m = 0;
+			TEVENT()
+			{
+				m = CreateEvent(0, MR, 0, 0);
+			}
+			void Close()
+			{
+				if (m)
+					CloseHandle(m);
+				m = 0;
+			}
+			DWORD Wait(DWORD i = INFINITE)
+			{
+				if (m)
+				{
+					return  WaitForSingleObject(m, i);
+				}
+				return WAIT_ABANDONED;
+			}
+			void Set()
+			{
+				if (m)
+					SetEvent(m);
+			}
+			void Reset()
+			{
+				if (m)
+					ResetEvent(m);
+			}
+			~TEVENT()
+			{
+				Close();
+			}
+
+			TEVENT(const TEVENT& m)
+			{
+				operator=(m);
+			}
+			TEVENT(TEVENT&& m)
+			{
+				operator=(std::forward<TEVENT<MR>>(m));
+			}
+
+			TEVENT& operator= (const TEVENT& b)
+			{
+				Close();
+				DuplicateHandle(GetCurrentProcess(), b.m, GetCurrentProcess(), &m, 0, 0, DUPLICATE_SAME_ACCESS);
+				return *this;
+			}
+			TEVENT& operator= (TEVENT&& b)
+			{
+				Close();
+				m = b.m;
+				b.m = 0;
+				return *this;
+			}
+
+
+		};
+
+
+
+		// astring class
+		class astring : public std::string
+		{
+		public:
+			astring& Format(const char* f, ...)
+			{
+				va_list args;
+				va_start(args, f);
+
+				int len = _vscprintf(f, args) + 100;
+				if (len < 8192)
+					len = 8192;
+				std::vector<char> b(len);
+				vsprintf_s(b.data(), len, f, args);
+				assign(b.data());
+				va_end(args);
+				return *this;
+			}
+
+		};
+
+
+		// ystring class, wstring <-> string wrapper
+		class ystring : public std::wstring
+		{
+		private:
+			mutable std::string asc_str_st;
+		public:
+
+			// Constructors
+			ystring(HWND hh) : std::wstring()
+			{
+				AssignFromHWND(hh);
+			}
+			ystring(HWND hh, int ID) : std::wstring()
+			{
+				AssignFromHWND(GetDlgItem(hh, ID));
+			}
+			ystring::ystring() : std::wstring()
+			{
+			}
+			ystring(const char* v, int CP = CP_UTF8)
+			{
+				EqChar(v, CP);
+			}
+			ystring(const std::string& v, int CP = CP_UTF8)
+			{
+				EqChar(v.c_str(), CP);
+			}
+			ystring(const wchar_t* f)
+			{
+				if (!f)
+					return;
+				assign(f);
+			}
+			ystring& Format(const wchar_t* f, ...)
+			{
+				va_list args;
+				va_start(args, f);
+
+				int len = _vscwprintf(f, args) + 100;
+				if (len < 8192)
+					len = 8192;
+				std::vector<wchar_t> b(len);
+				vswprintf_s(b.data(), len, f, args);
+				assign(b.data());
+				va_end(args);
+				return *this;
+			}
+
+			// operator =
+			void operator=(const char* v)
+			{
+				EqChar(v);
+			}
+			void operator=(const wchar_t* v)
+			{
+				assign(v);
+			}
+			void operator=(const std::wstring& v)
+			{
+				assign(v.c_str());
+			}
+			void operator=(const ystring& v)
+			{
+				assign(v.c_str());
+			}
+			void operator=(const std::string& v)
+			{
+				EqChar(v.c_str());
+			}
+			CLSID ToCLSID()
+			{
+				CLSID a;
+				CLSIDFromString(c_str(), &a);
+				return a;
+			}
+			void operator=(CLSID cid)
+			{
+				wchar_t ad[100] = { 0 };
+				StringFromGUID2(cid, ad, 100);
+				assign(ad);
+			}
+
+			operator const wchar_t* ()
+			{
+				return c_str();
+			}
+
+			// asc_str() and a_str() and operator const char*() 
+			const std::string& asc_str(int CP = CP_UTF8) const
+			{
+				const wchar_t* s = c_str();
+				int sz = WideCharToMultiByte(CP, 0, s, -1, 0, 0, 0, 0);
+				std::vector<char> d(sz + 100);
+				WideCharToMultiByte(CP, 0, s, -1, d.data(), sz + 100, 0, 0);
+				asc_str_st = d.data();
+				return asc_str_st;
+			}
+			operator const char* () const
+			{
+				return a_str();
+			}
+			const char* a_str(int CP = CP_UTF8) const
+			{
+				asc_str(CP);
+				return asc_str_st.c_str();
+			}
+
+			long long ll() const
+			{
+				return atoll(a_str());
+			}
+
+			// Internal Convertor
+			void EqChar(const char* v, int CP = CP_UTF8)
+			{
+				clear();
+				if (!v)
+					return;
+				int sz = MultiByteToWideChar(CP, 0, v, -1, 0, 0);
+				std::vector<wchar_t> d(sz + 100);
+				MultiByteToWideChar(CP, 0, v, -1, d.data(), sz + 100);
+				assign(d.data());
+			}
+
+			// From HWND
+			void AssignFromHWND(HWND hh)
+			{
+				int zl = GetWindowTextLength(hh);
+				std::vector<wchar_t> n(zl + 100);
+				GetWindowTextW(hh, n.data(), zl + 100);
+				assign(n.data());
+			}
+		};
+
 	namespace RESTAPI {
 
 		using namespace std;
@@ -4449,6 +4673,8 @@ namespace RGF
 
 
 		};
+
+
 
 		class REST
 		{
@@ -4755,8 +4981,13 @@ namespace RGF
 			}
 
 			HWND hAuthWindow = 0;
-			inline void RunURL(const wchar_t* url)
+			inline void RunURL(const wchar_t* url,bool Out = true)
 			{
+				if (Out)
+				{
+					ShellExecute(0, L"open", url, 0, 0, SW_SHOWMAXIMIZED);
+					return;
+				}
 				const char* res = "\x01\x00\xFF\xFF\x00\x00\x00\x00\x00\x00\x00\x00\xC8\x08\xCF\x80\x00\x00\x00\x00\x00\x00\xFA\x01\x7E\x01\x00\x00\x00\x00\x00\x00\x08\x00\x90\x01\x00\x01\x4D\x00\x53\x00\x20\x00\x53\x00\x68\x00\x65\x00\x6C\x00\x6C\x00\x20\x00\x44\x00\x6C\x00\x67\x00\x00\x00";
 				struct U
 				{
@@ -4826,19 +5057,54 @@ namespace RGF
 		class OAUTH2 : public REST
 		{
 		private:
-			std::string client;
-			std::string secret;
-			vector<std::string> scopes;
-			std::string accesstoken;
-			std::string refreshtoken;
-			std::string code;
+			ystring client;
+			ystring  secret;
+			std::vector<std::wstring> scopes;
+			ystring accesstoken;
+			ystring refreshtoken;
 			std::wstring LoginEndpoint;
+			std::wstring TokenEndpoint;
+			std::wstring TokenEndpointPath;
 			std::wstring LogoutEndpoint;
-			std::wstring RedirectURI;
+			ystring RedirectURI;
+
+			XSOCKETN::XSOCKET x;
+			vector<char> nd;
+			void Acc()
+			{
+				vector<char> data(10000);
+				for (;;)
+				{
+					auto a = x.Accept();
+					XSOCKETN::XSOCKET su(a);
+					memset(data.data(), 0, 10000);
+					int ar = su.receive(data.data(), 10000, 0, 0);
+					if (ar == 0 || ar == -1)
+					{
+						su.Close();
+						break;
+					}
+					nd = data;
+					char* ab = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nOK, We received an authorization code. \r\nYou may close this browser window.";
+					su.transmit(ab, (int)strlen(ab), true, 0);
+					su.Close();
+					SendMessage(hAuthWindow, WM_CLOSE, 0xDEADFACE, 0);
+				}
+			}
+
+			virtual string jsonreturn(ihandle& r)
+			{
+				vector<char> out;
+				ReadToMemory(r, out);
+				out.resize(out.size() + 1);
+				char* p = (char*)out.data();
+				return p;
+			}
+
 
 		public:
 
-			void SetClient(const char* c, const char* s, const wchar_t* reduri = L"", std::initializer_list<string> scops = {})
+			void SetClient(const wchar_t* c, const wchar_t* s, const wchar_t* reduri = L"", std::initializer_list<wstring> scops = {})
 			{
 				client = c;
 				secret = s;
@@ -4846,245 +5112,152 @@ namespace RGF
 				scopes = scops;
 			}
 
-			void SendEndpoints(const wchar_t* login = L"", const wchar_t* logout = L"")
+			void SendEndpoints(const wchar_t* login = L"", const wchar_t* TokenRequestHost = L"", const wchar_t* TokenRequestPath = L"", const wchar_t* logout = L"")
 			{
 				LoginEndpoint = login;
+				TokenEndpoint = TokenRequestHost;
+				TokenEndpointPath = TokenRequestPath;
 				LogoutEndpoint = logout;
 			}
 
-			void Login()
+			void SetTokens(const wchar_t* access = L"", const wchar_t* refresh = L"")
 			{
+				accesstoken = access;
+				refreshtoken = refresh;
+			}
 
+			std::wstring GetLoginURL()
+			{
+				std::wstring url = LoginEndpoint.c_str();
+				url += L"?client_id=";
+				url += client;
+				if (!scopes.empty())
+				{
+					url += L"&scope=";
+					for (auto& s : scopes)
+					{
+						url += s;
+						url += L"%20";
+					}
+					url.erase(url.end() - 3, url.end());
+				}
+				
+				url += L"&response_type=code";
+				url += L"&redirect_uri=";
+				url += RedirectURI;
+				return url;
+			}
+
+			HRESULT GetCode(int port, std::string& code,bool OutsideBrowser = true)
+			{
+				x.Create();
+				if (!x.BindAndListen(port))
+					return E_INVALIDARG;
+				std::thread t(&OAUTH2::Acc, this);
+				t.detach();
+
+				RunURL(GetLoginURL().c_str(), OutsideBrowser);
+
+				if (OutsideBrowser)
+				{
+						const char* res = "\x01\x00\xFF\xFF\x00\x00\x00\x00\x00\x00\x00\x00\xC8\x08\x01\x80\x02\x00\x00\x00\x00\x00\x36\x01\x73\x00\x00\x00\x00\x00\x00\x00\x08\x00\x90\x01\x00\x01\x4D\x00\x53\x00\x20\x00\x53\x00\x68\x00\x65\x00\x6C\x00\x6C\x00\x20\x00\x44\x00\x6C\x00\x67\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x02\x50\x08\x00\x35\x00\x27\x01\x08\x00\xBD\x02\x00\x00\xFF\xFF\x82\x00\x50\x00\x6C\x00\x65\x00\x61\x00\x73\x00\x65\x00\x20\x00\x77\x00\x61\x00\x69\x00\x74\x00\x2E\x00\x2E\x00\x2E\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x50\xFE\x00\x61\x00\x32\x00\x0E\x00\x02\x00\x00\x00\xFF\xFF\x80\x00\x43\x00\x61\x00\x6E\x00\x63\x00\x65\x00\x6C\x00\x00\x00\x00\x00";
+						struct U
+						{
+							OAUTH2* t;
+						};
+						U u;
+						u.t = this;
+						auto A_DP = [](HWND hh, UINT mm, WPARAM ww, LPARAM ll) -> INT_PTR
+						{
+							U* u = (U*)GetWindowLongPtr(hh, GWLP_USERDATA);
+							switch (mm)
+							{
+							case WM_INITDIALOG:
+							{
+								SetWindowLongPtr(hh, GWLP_USERDATA, ll);
+								u = (U*)GetWindowLongPtr(hh, GWLP_USERDATA);
+								u->t->hAuthWindow = hh;
+								SetDlgItemText(hh, 701, L"Login to your browser...");
+
+								return true;
+							}
+							case WM_CLOSE:
+							{
+								EndDialog(hh, IDCANCEL);
+								return 0;
+							}
+							case WM_COMMAND:
+							{
+								if (LOWORD(ww) == IDCANCEL)
+								{
+
+									EndDialog(hh, IDCANCEL);
+								}
+								return 0;
+							}
+							}
+
+							return 0;
+						};
+
+						std::thread tx([&]()
+							{
+								CoInitializeEx(0, COINIT_APARTMENTTHREADED);
+								DialogBoxIndirectParam(GetModuleHandle(0), (LPCDLGTEMPLATEW)res, 0, A_DP, (LPARAM)& u);
+							});
+						tx.join();
+				}
+
+
+				// GET /?code=
+				if (nd.size() == 0)
+					return E_FAIL;
+				char* a1 = strstr(nd.data(), "GET /?code=");
+				if (!a1)
+					return E_FAIL;
+				a1 += 11;
+				char* a2 = strchr(a1, ' ');
+				if (!a2)
+					return E_FAIL;
+				*a2 = 0;
+				code = a1;
+				return S_OK;
+
+			}
+
+			HRESULT GetTokens(ystring code)
+			{
+				Disconnect();
+				if (FAILED(Connect(TokenEndpoint.c_str(), true)))
+					return false;
+
+				string dk; // request
+				dk += "code=";
+				dk += code.a_str();
+				dk += "&grant_type=authorization_code";
+				dk += "&client_id=";
+				dk += client.a_str();
+				dk += "&client_secret=";
+				dk += secret.a_str();
+				dk += "&redirect_uri=";
+				dk += RedirectURI.a_str();
+				auto hi = RequestWithBuffer(TokenEndpointPath.c_str(), L"POST", { L"Content-type: application/x-www-form-urlencoded" }, dk.data(), dk.size());
+				auto jj = jsonreturn(hi);
+				Disconnect();
+				jsonxx::Object j;
+				j.parse(jj.c_str());
+				if (!j.has<jsonxx::String>("access_token"))
+					return E_FAIL;
+				accesstoken = j.get<jsonxx::String>("access_token");
+				if (!j.has<jsonxx::String>("refresh_token"))
+					return S_FALSE;
+				refreshtoken = j.get<jsonxx::String>("refresh_token");
+				return S_OK;
 			}
 
 		};
 
 	}
-
-
-
-	namespace GOD
-	{
-		template <int MR = 1>
-		class TEVENT
-		{
-		public:
-			HANDLE m = 0;
-			TEVENT()
-			{
-				m = CreateEvent(0, MR, 0, 0);
-			}
-			void Close()
-			{
-				if (m)
-					CloseHandle(m);
-				m = 0;
-			}
-			DWORD Wait(DWORD i = INFINITE)
-			{
-				if (m)
-				{
-					return  WaitForSingleObject(m, i);
-				}
-				return WAIT_ABANDONED;
-			}
-			void Set()
-			{
-				if (m)
-					SetEvent(m);
-			}
-			void Reset()
-			{
-				if (m)
-					ResetEvent(m);
-			}
-			~TEVENT()
-			{
-				Close();
-			}
-
-			TEVENT(const TEVENT& m)
-			{
-				operator=(m);
-			}
-			TEVENT(TEVENT&& m)
-			{
-				operator=(std::forward<TEVENT<MR>>(m));
-			}
-
-			TEVENT& operator= (const TEVENT& b)
-			{
-				Close();
-				DuplicateHandle(GetCurrentProcess(), b.m, GetCurrentProcess(), &m, 0, 0, DUPLICATE_SAME_ACCESS);
-				return *this;
-			}
-			TEVENT& operator= (TEVENT&& b)
-			{
-				Close();
-				m = b.m;
-				b.m = 0;
-				return *this;
-			}
-
-
-		};
-
-
-		// astring class
-		class astring : public std::string
-		{
-		public:
-			astring& Format(const char* f, ...)
-			{
-				va_list args;
-				va_start(args, f);
-
-				int len = _vscprintf(f, args) + 100;
-				if (len < 8192)
-					len = 8192;
-				std::vector<char> b(len);
-				vsprintf_s(b.data(), len, f, args);
-				assign(b.data());
-				va_end(args);
-				return *this;
-			}
-
-		};
-
-
-		// ystring class, wstring <-> string wrapper
-		class ystring : public std::wstring
-		{
-		private:
-			mutable std::string asc_str_st;
-		public:
-
-			// Constructors
-			ystring(HWND hh) : std::wstring()
-			{
-				AssignFromHWND(hh);
-			}
-			ystring(HWND hh, int ID) : std::wstring()
-			{
-				AssignFromHWND(GetDlgItem(hh, ID));
-			}
-			ystring::ystring() : std::wstring()
-			{
-			}
-			ystring(const char* v, int CP = CP_UTF8)
-			{
-				EqChar(v, CP);
-			}
-			ystring(const std::string& v, int CP = CP_UTF8)
-			{
-				EqChar(v.c_str(), CP);
-			}
-			ystring(const wchar_t* f)
-			{
-				if (!f)
-					return;
-				assign(f);
-			}
-			ystring& Format(const wchar_t* f, ...)
-			{
-				va_list args;
-				va_start(args, f);
-
-				int len = _vscwprintf(f, args) + 100;
-				if (len < 8192)
-					len = 8192;
-				std::vector<wchar_t> b(len);
-				vswprintf_s(b.data(), len, f, args);
-				assign(b.data());
-				va_end(args);
-				return *this;
-			}
-
-			// operator =
-			void operator=(const char* v)
-			{
-				EqChar(v);
-			}
-			void operator=(const wchar_t* v)
-			{
-				assign(v);
-			}
-			void operator=(const std::wstring& v)
-			{
-				assign(v.c_str());
-			}
-			void operator=(const ystring& v)
-			{
-				assign(v.c_str());
-			}
-			void operator=(const std::string& v)
-			{
-				EqChar(v.c_str());
-			}
-			CLSID ToCLSID()
-			{
-				CLSID a;
-				CLSIDFromString(c_str(), &a);
-				return a;
-			}
-			void operator=(CLSID cid)
-			{
-				wchar_t ad[100] = { 0 };
-				StringFromGUID2(cid, ad, 100);
-				assign(ad);
-			}
-
-			operator const wchar_t* ()
-			{
-				return c_str();
-			}
-
-			// asc_str() and a_str() and operator const char*() 
-			const std::string& asc_str(int CP = CP_UTF8) const
-			{
-				const wchar_t* s = c_str();
-				int sz = WideCharToMultiByte(CP, 0, s, -1, 0, 0, 0, 0);
-				std::vector<char> d(sz + 100);
-				WideCharToMultiByte(CP, 0, s, -1, d.data(), sz + 100, 0, 0);
-				asc_str_st = d.data();
-				return asc_str_st;
-			}
-			operator const char* () const
-			{
-				return a_str();
-			}
-			const char* a_str(int CP = CP_UTF8) const
-			{
-				asc_str(CP);
-				return asc_str_st.c_str();
-			}
-
-			long long ll() const
-			{
-				return atoll(a_str());
-			}
-
-			// Internal Convertor
-			void EqChar(const char* v, int CP = CP_UTF8)
-			{
-				clear();
-				if (!v)
-					return;
-				int sz = MultiByteToWideChar(CP, 0, v, -1, 0, 0);
-				std::vector<wchar_t> d(sz + 100);
-				MultiByteToWideChar(CP, 0, v, -1, d.data(), sz + 100);
-				assign(d.data());
-			}
-
-			// From HWND
-			void AssignFromHWND(HWND hh)
-			{
-				int zl = GetWindowTextLength(hh);
-				std::vector<wchar_t> n(zl + 100);
-				GetWindowTextW(hh, n.data(), zl + 100);
-				assign(n.data());
-			}
-		};
 
 
 		using namespace RESTAPI;
@@ -5105,7 +5278,7 @@ namespace RGF
 				vector<wchar_t> url2(1000);
 				DWORD fi = 1000;
 				InternetCanonicalizeUrl(i.c_str(), url2.data(), &fi, 0);
-				return GOD::ystring(url2.data()).a_str();
+				return ystring(url2.data()).a_str();
 			}
 
 			void Acc()

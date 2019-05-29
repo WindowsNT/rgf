@@ -4754,12 +4754,108 @@ namespace RGF
 				return p;
 			}
 
+			HWND hAuthWindow = 0;
+			inline void RunURL(const wchar_t* url)
+			{
+				const char* res = "\x01\x00\xFF\xFF\x00\x00\x00\x00\x00\x00\x00\x00\xC8\x08\xCF\x80\x00\x00\x00\x00\x00\x00\xFA\x01\x7E\x01\x00\x00\x00\x00\x00\x00\x08\x00\x90\x01\x00\x01\x4D\x00\x53\x00\x20\x00\x53\x00\x68\x00\x65\x00\x6C\x00\x6C\x00\x20\x00\x44\x00\x6C\x00\x67\x00\x00\x00";
+				struct U
+				{
+					std::wstring url;
+					REST* t;
+				};
+				U u;
+				u.url = url;
+				u.t = this;
+				auto A_DP = [](HWND hh, UINT mm, WPARAM ww, LPARAM ll) -> INT_PTR
+				{
+					U* u = (U*)GetWindowLongPtr(hh, GWLP_USERDATA);
+					HWND hX = GetDlgItem(hh, 888);
+					switch (mm)
+					{
+					case WM_INITDIALOG:
+					{
+						SetWindowLongPtr(hh, GWLP_USERDATA, ll);
+						u = (U*)GetWindowLongPtr(hh, GWLP_USERDATA);
+
+						u->t->hAuthWindow = hh;
+						hX = CreateWindowEx(0, L"AX", L"{8856F961-340A-11D0-A96B-00C04FD705A2}", WS_CHILD | WS_VISIBLE, 0, 0, 1, 1, hh, (HMENU)888, 0, 0);
+						SendMessage(hh, WM_SIZE, 0, 0);
+						SendMessage(hX, AX_INPLACE, 1, 0);
+						ShowWindow(hh, SW_SHOWMAXIMIZED);
+
+						CComPtr<IWebBrowser2> wb = 0;
+						SendMessage(hX, AX_QUERYINTERFACE, (WPARAM)& IID_IWebBrowser2, (LPARAM)& wb);
+						if (wb)
+							wb->Navigate(_bstr_t(u->url.c_str()), 0, 0, 0, 0);
+						return true;
+					}
+					case WM_CLOSE:
+					{
+						EndDialog(hh, 0);
+						u->t->hAuthWindow = 0;
+						return 0;
+					}
+
+					case WM_SIZE:
+					{
+						RECT rc;
+						GetClientRect(hh, &rc);
+						SetWindowPos(hX, 0, 0, 0, rc.right, rc.bottom - 0, SWP_SHOWWINDOW);
+						return true;
+					}
+					}
+
+					return 0;
+				};
+
+				std::thread tx([&]()
+					{
+						CoInitializeEx(0, COINIT_APARTMENTTHREADED);
+						DialogBoxIndirectParam(GetModuleHandle(0), (LPCDLGTEMPLATEW)res, 0, A_DP, (LPARAM)& u);
+					});
+				tx.join();
+
+				//		ShellExecute(0, L"open", url, 0, 0, SW_SHOWNORMAL);
+			}
+
+
 
 		};
 
 
 		class OAUTH2 : public REST
 		{
+		private:
+			std::string client;
+			std::string secret;
+			vector<std::string> scopes;
+			std::string accesstoken;
+			std::string refreshtoken;
+			std::string code;
+			std::wstring LoginEndpoint;
+			std::wstring LogoutEndpoint;
+			std::wstring RedirectURI;
+
+		public:
+
+			void SetClient(const char* c, const char* s, const wchar_t* reduri = L"", std::initializer_list<string> scops = {})
+			{
+				client = c;
+				secret = s;
+				RedirectURI = reduri;
+				scopes = scops;
+			}
+
+			void SendEndpoints(const wchar_t* login = L"", const wchar_t* logout = L"")
+			{
+				LoginEndpoint = login;
+				LogoutEndpoint = logout;
+			}
+
+			void Login()
+			{
+
+			}
 
 		};
 
@@ -5003,7 +5099,6 @@ namespace RGF
 			TEVENT<> ev;
 			XSOCKETN::XSOCKET x;
 			vector<char> nd;
-			HWND hAuthWindow = 0;
 
 			ystring encode(ystring i)
 			{
@@ -5041,68 +5136,6 @@ namespace RGF
 		public:
 
 
-			void RunURL(const wchar_t* url)
-			{
-				const char* res = "\x01\x00\xFF\xFF\x00\x00\x00\x00\x00\x00\x00\x00\xC8\x08\xCF\x80\x00\x00\x00\x00\x00\x00\xFA\x01\x7E\x01\x00\x00\x00\x00\x00\x00\x08\x00\x90\x01\x00\x01\x4D\x00\x53\x00\x20\x00\x53\x00\x68\x00\x65\x00\x6C\x00\x6C\x00\x20\x00\x44\x00\x6C\x00\x67\x00\x00\x00";
-				struct U
-				{
-					std::wstring url;
-					DRIVE* t;
-				};
-				U u;
-				u.url = url;
-				u.t = this;
-				auto A_DP = [](HWND hh, UINT mm, WPARAM ww, LPARAM ll) -> INT_PTR
-				{
-					U* u = (U*)GetWindowLongPtr(hh, GWLP_USERDATA);
-					HWND hX = GetDlgItem(hh, 888);
-					switch (mm)
-					{
-					case WM_INITDIALOG:
-					{
-						SetWindowLongPtr(hh, GWLP_USERDATA, ll);
-						u = (U*)GetWindowLongPtr(hh, GWLP_USERDATA);
-
-						u->t->hAuthWindow = hh;
-						hX = CreateWindowEx(0, L"AX", L"{8856F961-340A-11D0-A96B-00C04FD705A2}", WS_CHILD | WS_VISIBLE, 0, 0, 1, 1, hh, (HMENU)888, 0, 0);
-						SendMessage(hh, WM_SIZE, 0, 0);
-						SendMessage(hX, AX_INPLACE, 1, 0);
-						ShowWindow(hh, SW_SHOWMAXIMIZED);
-
-						CComPtr<IWebBrowser2> wb = 0;
-						SendMessage(hX, AX_QUERYINTERFACE, (WPARAM)& IID_IWebBrowser2, (LPARAM)& wb);
-						if (wb)
-							wb->Navigate(_bstr_t(u->url.c_str()), 0, 0, 0, 0);
-						return true;
-					}
-					case WM_CLOSE:
-					{
-						EndDialog(hh, 0);
-						u->t->hAuthWindow = 0;
-						return 0;
-					}
-
-					case WM_SIZE:
-					{
-						RECT rc;
-						GetClientRect(hh, &rc);
-						SetWindowPos(hX, 0, 0, 0, rc.right, rc.bottom - 0, SWP_SHOWWINDOW);
-						return true;
-					}
-					}
-
-					return 0;
-				};
-
-				std::thread tx([&]()
-					{
-						CoInitializeEx(0, COINIT_APARTMENTTHREADED);
-						DialogBoxIndirectParam(GetModuleHandle(0), (LPCDLGTEMPLATEW)res, 0, A_DP, (LPARAM)& u);
-					});
-				tx.join();
-
-				//		ShellExecute(0, L"open", url, 0, 0, SW_SHOWNORMAL);
-			}
 
 
 			DRIVE(const char* ccid = 0, const char* ssid = 0, int HostPort = 9932)
@@ -6837,6 +6870,8 @@ namespace RGF
 
 
 		// For Old style only
+		HWND hH = 0;
+		bool InProgress = false;
 		bool ShouldCancelProp = false;
 
 	};

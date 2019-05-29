@@ -3,10 +3,6 @@
 namespace RGF
 {
 
-	INT_PTR CALLBACK A_DP(HWND hh, UINT mm, WPARAM ww, LPARAM ll)
-	{
-		return 0;
-	}
 
 	auto PrjWiz1DP = [](HWND hh, UINT mm, WPARAM ww, LPARAM ll) ->INT_PTR
 	{
@@ -21,9 +17,11 @@ namespace RGF
 			}
 			case WM_INITDIALOG:
 			{
+				ShowWindow(GetDlgItem(GetParent(hh),IDOK),SW_HIDE);
 				SetWindowLongPtr(hh, GWLP_USERDATA, ll);
 				p = (PROPSHEETPAGE*)ll;
 				r = (RGF::RGBF*)p->lParam;
+				r->hH = hh;
 
 				if (r->resultFile.length())
 					SetDlgItemText(hh, 101, r->resultFile.c_str());
@@ -158,7 +156,7 @@ namespace RGF
 	}
 
 
-	void GoogleThreadLoad(RGBF* r, GOD::ystring NewName, std::string NewID,HWND hh)
+	void GoogleThreadLoad2(RGBF* r, GOD::ystring NewName, std::string NewID,HWND hh)
 	{
 		// We have data
 		std::vector<std::tuple<std::string, std::string, std::string>> AllItems;
@@ -184,6 +182,7 @@ namespace RGF
 			SetWindowLongPtr(hh, GWLP_USERDATA, ll);
 			p = (PROPSHEETPAGE*)ll;
 			r = (RGF::RGBF*)p->lParam;
+			r->hH = hh;
 			SendDlgItemMessage(hh, 801, PBM_SETMARQUEE, true, 0);
 			DWORD LEST = LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_FULLROWSELECT;
 			ListView_SetExtendedListViewStyle(hL, LEST);
@@ -210,7 +209,7 @@ namespace RGF
 			r->google.root = r->goo->GetRootFolderID();
 			if (vrf >= 1)
 			{
-				std::thread t(GoogleThreadLoad, r, "root", "root",hh);
+				std::thread t(GoogleThreadLoad2, r, "root", "root",hh);
 				t.detach();
 			}
 			else
@@ -225,6 +224,16 @@ namespace RGF
 		case WM_NOTIFY:
 		{
 			NMHDR* n = (NMHDR*)ll;
+			if (n->code == PSN_QUERYCANCEL)
+			{
+				if (r->InProgress)
+				{
+					r->ShouldCancelProp = true;
+					SetWindowLongPtr(hh, DWLP_MSGRESULT, true);
+				}
+				return 1;
+			}
+
 			if (n->hwndFrom == hL && n->code == NM_DBLCLK)
 			{
 				int L = ListView_GetNextItem(hL, -1, LVIS_SELECTED);
@@ -256,7 +265,7 @@ namespace RGF
 
 					GOD::ystring NewName = GOD::ystring(t1.data()).a_str();
 					std::string NewID = GOD::ystring(t2.data()).a_str();
-					std::thread t(GoogleThreadLoad, r, NewName, NewID,hh);
+					std::thread t(GoogleThreadLoad2, r, NewName, NewID,hh);
 					t.detach();
 
 				}
@@ -279,9 +288,72 @@ namespace RGF
 				ShowWindow(GetDlgItem(hh, 212), SW_HIDE);
 				ShowWindow(GetDlgItem(hh, 213), SW_HIDE);
 				r->google.root = r->goo->GetRootFolderID();
-				std::thread t(GoogleThreadLoad, r, "root", "root",hh);
+				std::thread t(GoogleThreadLoad2, r, "root", "root",hh);
 				t.detach();
 			}
+
+			// Save
+			if (LW == 202)
+			{
+				ShowWindow(GetDlgItem(hh, 701), SW_SHOW);
+				ShowWindow(GetDlgItem(hh, 801), SW_SHOW);
+				ShowWindow(GetDlgItem(hh, 901), SW_HIDE);
+				ShowWindow(GetDlgItem(hh, 101), SW_HIDE);
+				ShowWindow(GetDlgItem(hh, 202), SW_HIDE);
+				ShowWindow(GetDlgItem(hh, 211), SW_HIDE);
+				ShowWindow(GetDlgItem(hh, 212), SW_HIDE);
+				ShowWindow(GetDlgItem(hh, 213), SW_HIDE);
+
+				std::vector<wchar_t> t(1000);
+				GetDlgItemText(hh, 101, t.data(), 1000);
+				std::wstring fi = t.data();
+				if (fi.empty())
+					return 0;
+
+				if (wcschr(fi.c_str(), L'.') == 0)
+				{
+					if (r->DefExt.length())
+					{
+						fi += L".";
+						fi += r->DefExt;
+					}
+				}
+
+				// We upload to google
+				SendMessage(GetDlgItem(hh, 801), PBM_SETMARQUEE, 0, 0);
+				DWORD st = (DWORD)GetWindowLongPtr(GetDlgItem(hh, 801), GWL_STYLE);
+				st &= ~PBS_MARQUEE;
+				SetWindowLong(GetDlgItem(hh, 801), GWL_STYLE, st);
+				r->InProgress = true;
+				auto up = [](GOD::ystring fi, RGF::RGBF* s)
+				{
+					std::string ret;
+					auto hr = s->goo->UploadOnce(0, s->d, s->sz, s->google.root.c_str(), fi.a_str(), ret,
+						[](unsigned long long f, unsigned long long t, void* lp) -> HRESULT
+						{
+							RGBF* s = (RGBF*)lp;
+							f *= 100;
+							f = (int)(f / t);
+							SendDlgItemMessage(s->hH,801, PBM_SETPOS, (WPARAM)f, 0);
+							if (s->ShouldCancelProp)
+								return E_FAIL;
+							return S_OK;
+						}
+					, s);
+					s->InProgress = false;
+					s->rs = hr;
+					if (SUCCEEDED(hr))
+						s->resultFile = ret;
+					SendMessage(s->hH, WM_CLOSE, 0, 0);
+				};
+
+				GOD::ystring y = fi.c_str();
+				std::thread tf(up, y, r);
+				tf.detach();
+			}
+
+
+
 			return 0;
 		}
 
@@ -291,6 +363,7 @@ namespace RGF
 			// Fill Google Items
 			// ll = &vector<tuple<string,string>>
 			// ww = &string current root
+			ListView_DeleteAllItems(hL);
 			ShowWindow(GetDlgItem(hh, 701), SW_HIDE);
 			ShowWindow(GetDlgItem(hh, 801), SW_HIDE);
 			ShowWindow(GetDlgItem(hh, 901), SW_SHOW);
@@ -321,7 +394,6 @@ namespace RGF
 				GOD::ystring mi = std::get<2>(a);
 				if (mi == L"application/vnd.google-apps.folder")
 				{
-
 					_stprintf_s(tt.data(), 1000, _T("%s"), y1.c_str());
 					LV_ITEM lv = { 0 };
 					lv.mask = LVIF_TEXT | LVIF_PARAM;
@@ -332,7 +404,6 @@ namespace RGF
 
 					ListView_SetItemText(hL, L, 1,(LPWSTR) y2.c_str());
 					ListView_SetItemText(hL, L, 2,(LPWSTR)mi.c_str());
-
 				}
 				else
 				{
@@ -367,8 +438,6 @@ namespace RGF
 			SetWindowLongPtr(hh, GWLP_USERDATA, ll);
 			p = (PROPSHEETPAGE*)ll;
 			r = (RGF::RGBF*)p->lParam;
-
-
 			return true;
 		}
 		case WM_COMMAND:
@@ -382,7 +451,7 @@ namespace RGF
 
 
 
-	HRESULT FunctionX(RGBF& s)
+	HRESULT FunctionX2(RGBF& s)
 	{
 		RGF::AXLIBRARY::AXRegister();
 
@@ -398,7 +467,6 @@ namespace RGF
 
 		// Create the Sheet
 		std::vector<PROPSHEETPAGE> Pages;
-
 
 		// Local
 		if (true)
@@ -429,11 +497,13 @@ namespace RGF
 
 		PROPSHEETHEADER hdr = { 0 };
 		hdr.dwSize = sizeof(hdr);
-		hdr.dwFlags = PSH_PROPSHEETPAGE;
+		hdr.dwFlags = PSH_PROPSHEETPAGE  | PSH_NOAPPLYNOW;
 		hdr.hwndParent = s.hParent;
 		hdr.hInstance = 0;
 		hdr.nPages = (UINT)Pages.size();
 		hdr.nStartPage = 0;
+		hdr.pfnCallback = 0;
+//		hdr.pfnCallback
 		hdr.ppsp = Pages.data();
 		hdr.pszCaption = L"Save as...";
 		if (s.func == 1)
@@ -459,16 +529,16 @@ namespace RGF
 		return s.rs;
 	}
 
-	HRESULT Save(RGBF& s)
+	HRESULT Save2(RGBF& s)
 	{
 		s.func = 0;
-		return FunctionX(s);
+		return FunctionX2(s);
 	}
 
-	HRESULT Open(RGBF& s)
+	HRESULT Open2(RGBF& s)
 	{
 		s.func = 1;
-		return FunctionX(s);
+		return FunctionX2(s);
 	}
 
 

@@ -2,9 +2,8 @@
 #include "rgf1.hpp"
 #ifdef USE_UWP
 #include "rgf2.hpp"
-#else
-#include "rgf3.hpp"
 #endif
+#include "rgf3.hpp"
 
 
 #ifdef USE_UWP
@@ -82,7 +81,7 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	s.db.tokens[1] = rr.GetRootElement()["tokens"]["dropbox"].vv("t2").GetValue();
 
 
-	auto rv = RGF::Save(s);
+	auto rv = RGF::Save2(s);
 
 	// Save tokens if we got them
 	if (s.google.tokens.size() == 3)

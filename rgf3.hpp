@@ -609,6 +609,34 @@ namespace RGF
 	};
 
 
+	auto PrjWiz4DP = [](HWND hh, UINT mm, WPARAM ww, LPARAM ll) ->INT_PTR
+	{
+		PROPSHEETPAGE* p = (PROPSHEETPAGE*)GetWindowLongPtr(hh, GWLP_USERDATA);
+		RGF::RGBF* r = p ? (RGF::RGBF*)p->lParam : 0;
+		switch (mm)
+		{
+		case WM_CLOSE:
+		{
+			PropSheet_PressButton(GetParent(hh), PSBTN_CANCEL);
+			return 0;
+		}
+		case WM_INITDIALOG:
+		{
+			SetWindowLongPtr(hh, GWLP_USERDATA, ll);
+			p = (PROPSHEETPAGE*)ll;
+			r = (RGF::RGBF*)p->lParam;
+			return true;
+		}
+		case WM_COMMAND:
+		{
+			int LW = LOWORD(ww);
+			return 0;
+		}
+		}
+		return 0;
+	};
+
+
 
 	HRESULT FunctionX2(RGBF& s)
 	{
@@ -650,6 +678,32 @@ namespace RGF
 			p1.hInstance = GetModuleHandle(0);
 			p1.pszTemplate = L"DIALOG_RGF_GOOGLE";
 			p1.pfnDlgProc = PrjWiz2DP;
+			p1.lParam = (LPARAM)& s;
+			Pages.push_back(p1);
+		}
+		// OneDrive
+		if (true)
+		{
+			PROPSHEETPAGE p1 = { 0 };
+			p1.dwSize = sizeof(p1);
+			p1.pszHeaderTitle = L"OneDrive";
+			p1.lParam = 0;
+			p1.hInstance = GetModuleHandle(0);
+			p1.pszTemplate = L"DIALOG_RGF_ONE";
+			p1.pfnDlgProc = PrjWiz3DP;
+			p1.lParam = (LPARAM)& s;
+			Pages.push_back(p1);
+		}
+		// DropBox
+		if (true)
+		{
+			PROPSHEETPAGE p1 = { 0 };
+			p1.dwSize = sizeof(p1);
+			p1.pszHeaderTitle = L"DropBox";
+			p1.lParam = 0;
+			p1.hInstance = GetModuleHandle(0);
+			p1.pszTemplate = L"DIALOG_RGF_DROPBOX";
+			p1.pfnDlgProc = PrjWiz4DP;
 			p1.lParam = (LPARAM)& s;
 			Pages.push_back(p1);
 		}

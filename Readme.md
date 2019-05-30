@@ -2,6 +2,11 @@
 
 A way for normal Win32 applications to have Load/Save features from either a local file or GoogleDrive/OneDrive/DropBox.
 
+
+![WUP](https://raw.githubusercontent.com/WindowsNT/rgf/master/1.jpg)
+![Plain](https://raw.githubusercontent.com/WindowsNT/rgf/master/2.jpg)
+
+
 ## Usage:
 
 ```C++

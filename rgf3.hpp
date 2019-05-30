@@ -3,6 +3,97 @@
 namespace RGF
 {
 
+	struct ASKTEXT
+	{
+		const wchar_t* ti;
+		const wchar_t* as;
+		wchar_t* re;
+		int P;
+		std::wstring* re2;
+		int mx = 1000;
+	};
+
+	inline INT_PTR CALLBACK ASKTEXT_DP(HWND hh, UINT mm, WPARAM ww, LPARAM ll)
+	{
+		static ASKTEXT* as = 0;
+		switch (mm)
+		{
+		case WM_INITDIALOG:
+		{
+			as = (ASKTEXT*)ll;
+			SetWindowText(hh, as->ti);
+			if (as->P != 2)
+			{
+				SetWindowText(GetDlgItem(hh, 101), as->as);
+				if (as->re)
+					SetWindowText(GetDlgItem(hh, 102), as->re);
+				if (as->re2)
+					SetWindowText(GetDlgItem(hh, 102), as->re2->c_str());
+			}
+			else
+				SetWindowText(GetDlgItem(hh, 701), as->as);
+			if (as->P == 1)
+			{
+				auto w = GetWindowLongPtr(GetDlgItem(hh, 102), GWL_STYLE);
+				w |= ES_PASSWORD;
+				SetWindowLongPtr(GetDlgItem(hh, 102), GWL_STYLE, w);
+			}
+			return true;
+		}
+		case WM_COMMAND:
+		{
+			if (LOWORD(ww) == IDOK)
+			{
+				wchar_t re1[1000] = { 0 };
+				wchar_t re2[1000] = { 0 };
+				//					MessageBox(0, L"foo", 0, 0);
+				if (as->P == 2)
+				{
+					GetWindowText(GetDlgItem(hh, 101), re1, 1000);
+					GetWindowText(GetDlgItem(hh, 102), re2, 1000);
+					if (wcscmp(re1, re2) != 0 || wcslen(re1) == 0)
+					{
+						SetWindowText(GetDlgItem(hh, 101), L"");
+						SetWindowText(GetDlgItem(hh, 102), L"");
+						SetFocus(GetDlgItem(hh, 101));
+						return 0;
+					}
+					wcscpy_s(as->re, 1000, re1);
+					EndDialog(hh, IDOK);
+					return 0;
+				}
+
+				if (as->re2)
+				{
+					int lex = GetWindowTextLength(GetDlgItem(hh, 102));
+					std::vector<wchar_t> re(lex + 100);
+					GetWindowText(GetDlgItem(hh, 102), re.data(), lex + 100);
+					*as->re2 = re.data();
+					EndDialog(hh, IDOK);
+				}
+				else
+				{
+					GetWindowText(GetDlgItem(hh, 102), as->re, as->mx);
+					EndDialog(hh, IDOK);
+				}
+				return 0;
+			}
+			if (LOWORD(ww) == IDCANCEL)
+			{
+				EndDialog(hh, IDCANCEL);
+				return 0;
+			}
+		}
+		}
+		return 0;
+	}
+
+	inline bool AskText(HWND hh, const TCHAR* ti, const TCHAR* as, TCHAR* re, std::wstring* re2 = 0, int mxt = 1000)
+	{
+		const char* res = "\xC4\x0A\xCA\x90\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x6D\x01\x3E\x00\x00\x00\x00\x00\x00\x00\x0A\x00\x54\x00\x61\x00\x68\x00\x6F\x00\x6D\x00\x61\x00\x00\x00\x01\x00\x00\x50\x00\x00\x00\x00\x0A\x00\x09\x00\x1C\x01\x1A\x00\x65\x00\xFF\xFF\x82\x00\x00\x00\x00\x00\x00\x00\x80\x00\x81\x50\x00\x00\x00\x00\x0A\x00\x29\x00\x1D\x01\x0F\x00\x66\x00\xFF\xFF\x81\x00\x00\x00\x00\x00\x00\x00\x00\x03\x01\x50\x00\x00\x00\x00\x2F\x01\x16\x00\x32\x00\x0E\x00\x01\x00\xFF\xFF\x80\x00\x4F\x00\x4B\x00\x00\x00\x00\x00\x00\x00\x00\x03\x01\x50\x00\x00\x00\x00\x2F\x01\x29\x00\x32\x00\x0E\x00\x02\x00\xFF\xFF\x80\x00\x43\x00\x61\x00\x6E\x00\x63\x00\x65\x00\x6C\x00\x00\x00\x00\x00";
+		ASKTEXT a = { ti,as,re,0,re2,mxt };
+		return (DialogBoxIndirectParam(GetModuleHandle(0), (LPCDLGTEMPLATEW)res, hh, ASKTEXT_DP, (LPARAM)& a) == IDOK);
+	}
 
 	auto PrjWiz1DP = [](HWND hh, UINT mm, WPARAM ww, LPARAM ll) ->INT_PTR
 	{
@@ -165,6 +256,34 @@ namespace RGF
 		SendMessage(hh, WM_USER + 501, (WPARAM)& NewName, (LPARAM)& AllItems);
 	};
 
+
+	void GenericDialogState(HWND hh,int s)
+	{
+		if (s == 0) // waiting
+		{
+			ShowWindow(GetDlgItem(hh, 701), SW_SHOW);
+			ShowWindow(GetDlgItem(hh, 801), SW_SHOW);
+			ShowWindow(GetDlgItem(hh, 901), SW_HIDE);
+			ShowWindow(GetDlgItem(hh, 101), SW_HIDE);
+			ShowWindow(GetDlgItem(hh, 202), SW_HIDE);
+			ShowWindow(GetDlgItem(hh, 211), SW_HIDE);
+			ShowWindow(GetDlgItem(hh, 212), SW_HIDE);
+			ShowWindow(GetDlgItem(hh, 213), SW_HIDE);
+		}
+		else
+		{
+			ShowWindow(GetDlgItem(hh, 701), SW_HIDE);
+			ShowWindow(GetDlgItem(hh, 801), SW_HIDE);
+			ShowWindow(GetDlgItem(hh, 901), SW_SHOW);
+			ShowWindow(GetDlgItem(hh, 101), SW_SHOW);
+			ShowWindow(GetDlgItem(hh, 202), SW_SHOW);
+			ShowWindow(GetDlgItem(hh, 211), SW_SHOW);
+			ShowWindow(GetDlgItem(hh, 212), SW_SHOW);
+			ShowWindow(GetDlgItem(hh, 213), SW_SHOW);
+
+		}
+	}
+
 	auto PrjWiz2DP = [](HWND hh, UINT mm, WPARAM ww, LPARAM ll) ->INT_PTR
 	{
 		PROPSHEETPAGE* p = (PROPSHEETPAGE*)GetWindowLongPtr(hh, GWLP_USERDATA);
@@ -183,6 +302,8 @@ namespace RGF
 			p = (PROPSHEETPAGE*)ll;
 			r = (RGF::RGBF*)p->lParam;
 			r->hH = hh;
+			if (r->func == 1)
+				DestroyWindow(GetDlgItem(hh, 202));
 			SendDlgItemMessage(hh, 801, PBM_SETMARQUEE, true, 0);
 			DWORD LEST = LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_FULLROWSELECT;
 			ListView_SetExtendedListViewStyle(hL, LEST);
@@ -190,14 +311,7 @@ namespace RGF
 			ListInsertColumn(hL, 1, LVCF_SUBITEM | LVCF_TEXT | LVCF_WIDTH, 0, 0, L"ID", 0, 0, 0, 0);
 			ListInsertColumn(hL, 2, LVCF_SUBITEM | LVCF_TEXT | LVCF_WIDTH, 0, 0, L"MIME", 0, 0, 0, 0);
 
-			ShowWindow(GetDlgItem(hh, 701), SW_SHOW);
-			ShowWindow(GetDlgItem(hh, 801), SW_SHOW);
-			ShowWindow(GetDlgItem(hh, 901), SW_HIDE);
-			ShowWindow(GetDlgItem(hh, 101), SW_HIDE);
-			ShowWindow(GetDlgItem(hh, 202), SW_HIDE);
-			ShowWindow(GetDlgItem(hh, 211), SW_HIDE);
-			ShowWindow(GetDlgItem(hh, 212), SW_HIDE);
-			ShowWindow(GetDlgItem(hh, 213), SW_HIDE);
+			GenericDialogState(hh,0);
 
 			auto ty1 = r->google.id.c_str();
 			auto ty2 = r->google.secret.c_str();
@@ -253,14 +367,7 @@ namespace RGF
 					r->google.cd += GOD::ystring(t1.data()).a_str();
 					r->google.cd += "\\";
 					r->google.root = GOD::ystring(t2.data()).a_str();
-					ShowWindow(GetDlgItem(hh, 701), SW_SHOW);
-					ShowWindow(GetDlgItem(hh, 801), SW_SHOW);
-					ShowWindow(GetDlgItem(hh, 901), SW_HIDE);
-					ShowWindow(GetDlgItem(hh, 101), SW_HIDE);
-					ShowWindow(GetDlgItem(hh, 202), SW_HIDE);
-					ShowWindow(GetDlgItem(hh, 211), SW_HIDE);
-					ShowWindow(GetDlgItem(hh, 212), SW_HIDE);
-					ShowWindow(GetDlgItem(hh, 213), SW_HIDE);
+					GenericDialogState(hh, 0);
 					ListView_DeleteAllItems(hL);
 
 					GOD::ystring NewName = GOD::ystring(t1.data()).a_str();
@@ -268,6 +375,43 @@ namespace RGF
 					std::thread t(GoogleThreadLoad2, r, NewName, NewID,hh);
 					t.detach();
 
+				}
+				else
+				{
+					// Download
+					GenericDialogState(hh, 0);
+					SetDlgItemText(hh, 701, L"Opening...");
+					GOD::ystring fid = t2.data();
+					r->resultFile = fid;
+					DWORD st = (DWORD)GetWindowLongPtr(GetDlgItem(hh, 801), GWL_STYLE);
+					st &= ~PBS_MARQUEE;
+					SetWindowLong(GetDlgItem(hh, 801), GWL_STYLE, st);
+
+					if (r->read)
+					{
+						auto foo = [](GOD::ystring fid, RGF::RGBF* r)
+						{
+							r->InProgress = true;
+							auto hr = r->goo->Download(fid.a_str(), 0, r->read, 0, (unsigned long long) - 1, [](unsigned long long f, unsigned long long t, void* lp) -> HRESULT
+								{
+									RGF::RGBF* s = (RGF::RGBF*)lp;
+									f *= 100;
+									f = (int)(f / t);
+									SendDlgItemMessage(s->hH, 801, PBM_SETPOS, (WPARAM)f, 0);
+									if (s->ShouldCancelProp)
+										return E_FAIL;
+									return S_OK;
+								}, r);
+							r->rs = hr;
+							r->InProgress = false;
+							SendMessage(r->hH, WM_CLOSE, 0, 0);
+						};
+
+						std::thread tx(foo, fid, r);
+						tx.detach();
+						return 0;
+					}
+					SendMessage(r->hH, WM_CLOSE, 0, 0);
 				}
 			}
 
@@ -279,31 +423,40 @@ namespace RGF
 			if (LW == 211)
 			{
 				// Top
-				ShowWindow(GetDlgItem(hh, 701), SW_SHOW);
-				ShowWindow(GetDlgItem(hh, 801), SW_SHOW);
-				ShowWindow(GetDlgItem(hh, 901), SW_HIDE);
-				ShowWindow(GetDlgItem(hh, 101), SW_HIDE);
-				ShowWindow(GetDlgItem(hh, 202), SW_HIDE);
-				ShowWindow(GetDlgItem(hh, 211), SW_HIDE);
-				ShowWindow(GetDlgItem(hh, 212), SW_HIDE);
-				ShowWindow(GetDlgItem(hh, 213), SW_HIDE);
+				GenericDialogState(hh, 0);
 				r->google.root = r->goo->GetRootFolderID();
 				std::thread t(GoogleThreadLoad2, r, "root", "root",hh);
 				t.detach();
 			}
 
+			if (LW == 212)
+			{
+				// New folder
+				std::vector<wchar_t> nf(1000);
+				if (!AskText(hh, L"New folder", L"New folder name:", nf.data()))
+					return 0;
+				RGF::GOD::ystring nff = nf.data();
+				r->goo->CreateFolder(nff.a_str(), r->google.root.c_str());
+				GenericDialogState(hh, 0);
+				std::thread t(GoogleThreadLoad2, r, nff, r->google.root,hh);
+				t.detach();
+			}
+
+			if (LW == 213)
+			{
+				// Logout
+				r->google.tokens[0] = "";
+				r->google.tokens[1] = "";
+				r->goo->Unauth();
+				r->goo = nullptr;
+				SendMessage(GetParent(hh), PSM_SETCURSEL, 0, 0);
+			}
+
+
 			// Save
 			if (LW == 202)
 			{
-				ShowWindow(GetDlgItem(hh, 701), SW_SHOW);
-				ShowWindow(GetDlgItem(hh, 801), SW_SHOW);
-				ShowWindow(GetDlgItem(hh, 901), SW_HIDE);
-				ShowWindow(GetDlgItem(hh, 101), SW_HIDE);
-				ShowWindow(GetDlgItem(hh, 202), SW_HIDE);
-				ShowWindow(GetDlgItem(hh, 211), SW_HIDE);
-				ShowWindow(GetDlgItem(hh, 212), SW_HIDE);
-				ShowWindow(GetDlgItem(hh, 213), SW_HIDE);
-
+				GenericDialogState(hh, 0);
 				std::vector<wchar_t> t(1000);
 				GetDlgItemText(hh, 101, t.data(), 1000);
 				std::wstring fi = t.data();
@@ -321,6 +474,7 @@ namespace RGF
 
 				// We upload to google
 				SendMessage(GetDlgItem(hh, 801), PBM_SETMARQUEE, 0, 0);
+				SetDlgItemText(hh,701,L"Saving...");
 				DWORD st = (DWORD)GetWindowLongPtr(GetDlgItem(hh, 801), GWL_STYLE);
 				st &= ~PBS_MARQUEE;
 				SetWindowLong(GetDlgItem(hh, 801), GWL_STYLE, st);
@@ -364,14 +518,7 @@ namespace RGF
 			// ll = &vector<tuple<string,string>>
 			// ww = &string current root
 			ListView_DeleteAllItems(hL);
-			ShowWindow(GetDlgItem(hh, 701), SW_HIDE);
-			ShowWindow(GetDlgItem(hh, 801), SW_HIDE);
-			ShowWindow(GetDlgItem(hh, 901), SW_SHOW);
-			ShowWindow(GetDlgItem(hh, 101), SW_SHOW);
-			ShowWindow(GetDlgItem(hh, 202), SW_SHOW);
-			ShowWindow(GetDlgItem(hh, 211), SW_SHOW);
-			ShowWindow(GetDlgItem(hh, 212), SW_SHOW);
-			ShowWindow(GetDlgItem(hh, 213), SW_SHOW);
+			GenericDialogState(hh, 1);
 
 			if (r->func == 0)
 			{
@@ -407,8 +554,20 @@ namespace RGF
 				}
 				else
 				{
-				}
+					if (r->func == 1)
+					{
+						_stprintf_s(tt.data(), 1000, _T("%s"), y1.c_str());
+						LV_ITEM lv = { 0 };
+						lv.mask = LVIF_TEXT | LVIF_PARAM;
+						lv.iItem = ListView_GetItemCount(hL);
+						lv.pszText = tt.data();
+						lv.lParam = (LPARAM)lv.iItem;
+						int L = ListView_InsertItem(hL, &lv);
 
+						ListView_SetItemText(hL, L, 1, (LPWSTR)y2.c_str());
+						ListView_SetItemText(hL, L, 2, (LPWSTR)mi.c_str());
+					}
+				}
 				AutoSizeLVColumn(hL, 0);
 			}
 

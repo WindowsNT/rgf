@@ -108,7 +108,7 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	s2.read = &r;
 	s2.Filter.clear();
 	s2.resultFile.clear();
-	rv = RGF::Open(s2);
+	rv = RGF::Open2(s2);
 
 	return 0;
 	}

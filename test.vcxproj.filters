@@ -12,6 +12,9 @@
     <Filter Include="Code">
       <UniqueIdentifier>{f39967f6-f5d7-4585-8037-d7a7d3d33408}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{cbac3cc4-fea9-46d7-a8cb-ecba87ad35b0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -26,15 +29,23 @@
     <ClInclude Include="rgf3.hpp">
       <Filter>Code</Filter>
     </ClInclude>
-    <ClInclude Include="resource.h" />
+    <ClInclude Include="resource.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Manifest Include="1.manifest" />
+    <Manifest Include="1.manifest">
+      <Filter>Resources</Filter>
+    </Manifest>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Readme.md" />
+    <None Include="Readme.md">
+      <Filter>Resources</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="rgf.rc" />
+    <ResourceCompile Include="rgf.rc">
+      <Filter>Resources</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

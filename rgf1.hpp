@@ -5104,6 +5104,19 @@ namespace RGF
 
 		public:
 
+			bool HasRefresh()
+			{
+				if (refreshtoken.length() > 0)
+					return true;
+				return false;
+			}
+			bool HasAccess()
+			{
+				if (accesstoken.length() > 0)
+					return true;
+				return false;
+			}
+
 			void SetClient(const wchar_t* c, const wchar_t* s, const wchar_t* reduri = L"", std::initializer_list<wstring> scops = {})
 			{
 				client = c;
@@ -5272,6 +5285,7 @@ namespace RGF
 			TEVENT<> ev;
 			XSOCKETN::XSOCKET x;
 			vector<char> nd;
+			OAUTH2 o;
 
 			ystring encode(ystring i)
 			{

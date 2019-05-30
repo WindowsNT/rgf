@@ -284,6 +284,72 @@ namespace RGF
 		}
 	}
 
+	void FillList(HWND hh,UINT mm,WPARAM ww,LPARAM ll)
+	{
+		PROPSHEETPAGE* p = (PROPSHEETPAGE*)GetWindowLongPtr(hh, GWLP_USERDATA);
+		RGF::RGBF* r = p ? (RGF::RGBF*)p->lParam : 0;
+		HWND hL = GetDlgItem(hh, 901);
+		// Fill One Items
+// ll = &vector<tuple<string,string>>
+// ww = &string current root
+		ListView_DeleteAllItems(hL);
+		GenericDialogState(hh, 1);
+
+		if (r->func == 0)
+		{
+			GOD::ystring y;
+			GOD::ystring curr = *(GOD::ystring*)ww;
+			y.Format(L"Save to %s", curr.c_str());
+			SetDlgItemText(hh, 202, y.c_str());
+		}
+
+		std::vector<std::tuple<std::string, std::string, std::string>>* vx = (std::vector<std::tuple<std::string, std::string, std::string>>*)ll;
+
+
+		for (auto& a : *vx)
+		{
+			GOD::ystring y1 = std::get<1>(a);
+			GOD::ystring y2 = std::get<0>(a);
+			GOD::ystring sp;
+
+			std::vector<wchar_t> tt(1000);
+			GOD::ystring mi = std::get<2>(a);
+			if (mi == L"application/vnd.google-apps.folder")
+			{
+				_stprintf_s(tt.data(), 1000, _T("%s"), y1.c_str());
+				LV_ITEM lv = { 0 };
+				lv.mask = LVIF_TEXT | LVIF_PARAM;
+				lv.iItem = ListView_GetItemCount(hL);
+				lv.pszText = tt.data();
+				lv.lParam = (LPARAM)lv.iItem;
+				int L = ListView_InsertItem(hL, &lv);
+
+				ListView_SetItemText(hL, L, 1, (LPWSTR)y2.c_str());
+				ListView_SetItemText(hL, L, 2, (LPWSTR)mi.c_str());
+			}
+			else
+			{
+				if (r->func == 1)
+				{
+					_stprintf_s(tt.data(), 1000, _T("%s"), y1.c_str());
+					LV_ITEM lv = { 0 };
+					lv.mask = LVIF_TEXT | LVIF_PARAM;
+					lv.iItem = ListView_GetItemCount(hL);
+					lv.pszText = tt.data();
+					lv.lParam = (LPARAM)lv.iItem;
+					int L = ListView_InsertItem(hL, &lv);
+
+					ListView_SetItemText(hL, L, 1, (LPWSTR)y2.c_str());
+					ListView_SetItemText(hL, L, 2, (LPWSTR)mi.c_str());
+				}
+			}
+			AutoSizeLVColumn(hL, 0);
+		}
+
+		SendMessage(hh, WM_SIZE, 0, 0);
+
+	}
+
 	auto PrjWiz2DP = [](HWND hh, UINT mm, WPARAM ww, LPARAM ll) ->INT_PTR
 	{
 		PROPSHEETPAGE* p = (PROPSHEETPAGE*)GetWindowLongPtr(hh, GWLP_USERDATA);
@@ -511,67 +577,9 @@ namespace RGF
 			return 0;
 		}
 
-
 		case WM_USER + 501:
 		{
-			// Fill Google Items
-			// ll = &vector<tuple<string,string>>
-			// ww = &string current root
-			ListView_DeleteAllItems(hL);
-			GenericDialogState(hh, 1);
-
-			if (r->func == 0)
-			{
-				GOD::ystring y;
-				GOD::ystring curr = *(GOD::ystring*)ww;
-				y.Format(L"Save to %s", curr.c_str());
-				SetDlgItemText(hh, 202, y.c_str());
-			}
-
-			std::vector<std::tuple<std::string, std::string, std::string>>* vx = (std::vector<std::tuple<std::string, std::string, std::string>>*)ll;
-
-
-			for (auto& a : *vx)
-			{
-				GOD::ystring y1 = std::get<1>(a);
-				GOD::ystring y2 = std::get<0>(a);
-				GOD::ystring sp;
-
-				std::vector<wchar_t> tt(1000);
-				GOD::ystring mi = std::get<2>(a);
-				if (mi == L"application/vnd.google-apps.folder")
-				{
-					_stprintf_s(tt.data(), 1000, _T("%s"), y1.c_str());
-					LV_ITEM lv = { 0 };
-					lv.mask = LVIF_TEXT | LVIF_PARAM;
-					lv.iItem = ListView_GetItemCount(hL);
-					lv.pszText = tt.data();
-					lv.lParam = (LPARAM)lv.iItem;
-					int L = ListView_InsertItem(hL, &lv);
-
-					ListView_SetItemText(hL, L, 1,(LPWSTR) y2.c_str());
-					ListView_SetItemText(hL, L, 2,(LPWSTR)mi.c_str());
-				}
-				else
-				{
-					if (r->func == 1)
-					{
-						_stprintf_s(tt.data(), 1000, _T("%s"), y1.c_str());
-						LV_ITEM lv = { 0 };
-						lv.mask = LVIF_TEXT | LVIF_PARAM;
-						lv.iItem = ListView_GetItemCount(hL);
-						lv.pszText = tt.data();
-						lv.lParam = (LPARAM)lv.iItem;
-						int L = ListView_InsertItem(hL, &lv);
-
-						ListView_SetItemText(hL, L, 1, (LPWSTR)y2.c_str());
-						ListView_SetItemText(hL, L, 2, (LPWSTR)mi.c_str());
-					}
-				}
-				AutoSizeLVColumn(hL, 0);
-			}
-
-			SendMessage(hh, WM_SIZE, 0, 0);
+			FillList(hh, mm, ww, ll);
 			return 0;
 		}
 
@@ -580,11 +588,21 @@ namespace RGF
 	};
 
 
+	void OneThreadLoad2(RGBF* r, GOD::ystring NewName, std::string NewID,HWND hh)
+	{
+		// We have data
+		std::vector<std::tuple<std::string, std::string, std::string>> AllItems;
+		std::string j = r->one->dir(r->onedrive.root.c_str(), true, true);
+		RGF::GOD::EnumNames(*r->one, j, &AllItems, 2, !r->func);
+		SendMessage(hh, WM_USER + 501, (WPARAM)& NewName, (LPARAM)& AllItems);
+	}
+
 
 	auto PrjWiz3DP = [](HWND hh, UINT mm, WPARAM ww, LPARAM ll) ->INT_PTR
 	{
 		PROPSHEETPAGE* p = (PROPSHEETPAGE*)GetWindowLongPtr(hh, GWLP_USERDATA);
 		RGF::RGBF* r = p ? (RGF::RGBF*)p->lParam : 0;
+		HWND hL = GetDlgItem(hh, 901);
 		switch (mm)
 		{
 		case WM_CLOSE:
@@ -597,13 +615,225 @@ namespace RGF
 			SetWindowLongPtr(hh, GWLP_USERDATA, ll);
 			p = (PROPSHEETPAGE*)ll;
 			r = (RGF::RGBF*)p->lParam;
+			r->hH = hh;
+			if (r->func == 1)
+				DestroyWindow(GetDlgItem(hh, 202));
+			SendDlgItemMessage(hh, 801, PBM_SETMARQUEE, true, 0);
+			DWORD LEST = LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_FULLROWSELECT;
+			ListView_SetExtendedListViewStyle(hL, LEST);
+			ListInsertColumn(hL, 0, LVCF_SUBITEM | LVCF_TEXT | LVCF_WIDTH, 0, 30, L"Name", 0, 0, 0, 0);
+			ListInsertColumn(hL, 1, LVCF_SUBITEM | LVCF_TEXT | LVCF_WIDTH, 0, 0, L"ID", 0, 0, 0, 0);
+			ListInsertColumn(hL, 2, LVCF_SUBITEM | LVCF_TEXT | LVCF_WIDTH, 0, 0, L"MIME", 0, 0, 0, 0);
+
+			GenericDialogState(hh, 0);
+
+			auto ty1 = r->onedrive.id.c_str();
+			auto ty2 = r->onedrive.secret.c_str();
+			r->one = std::make_shared<RGF::GOD::ONEDRIVE>(ty1, ty2);
+			r->onedrive.tokens.resize(3);
+			int vrf = r->one->Auth(r->onedrive.tokens);
+			if (vrf == 2)
+				vrf = r->one->Auth(r->onedrive.tokens);
+			r->onedrive.root = r->one->GetRootFolderID();
+			if (vrf >= 1)
+			{
+				auto root = r->one->GetRootFolderID();
+				std::thread t(OneThreadLoad2, r,root, "root", hh);
+				t.detach();
+			}
+			else
+			{
+				ShowWindow(GetDlgItem(hh, 701), SW_HIDE);
+				ShowWindow(GetDlgItem(hh, 801), SW_HIDE);
+			}
+
+
 			return true;
+		}
+
+		case WM_NOTIFY:
+		{
+			NMHDR* n = (NMHDR*)ll;
+			if (n->code == PSN_QUERYCANCEL)
+			{
+				if (r->InProgress)
+				{
+					r->ShouldCancelProp = true;
+					SetWindowLongPtr(hh, DWLP_MSGRESULT, true);
+				}
+				return 1;
+			}
+
+			if (n->hwndFrom == hL && n->code == NM_DBLCLK)
+			{
+				int L = ListView_GetNextItem(hL, -1, LVIS_SELECTED);
+				if (L == -1)
+					return 0;
+
+				std::vector<wchar_t> t1(1000);
+				std::vector<wchar_t> t2(1000);
+				std::vector<wchar_t> t3(1000);
+				ListView_GetItemText(hL, L, 0, t1.data(), 1000);
+				ListView_GetItemText(hL, L, 1, t2.data(), 1000);
+				ListView_GetItemText(hL, L, 2, t3.data(), 1000);
+				if (_wcsicmp(t3.data(), L"application/vnd.google-apps.folder") == 0)
+				{
+					// Enter 
+					auto pr = r->onedrive.root;
+					r->onedrive.cd += GOD::ystring(t1.data()).a_str();
+					r->onedrive.cd += "\\";
+					r->onedrive.root = GOD::ystring(t2.data()).a_str();
+					GenericDialogState(hh, 0);
+					ListView_DeleteAllItems(hL);
+
+					GOD::ystring NewName = GOD::ystring(t1.data()).a_str();
+					std::string NewID = GOD::ystring(t2.data()).a_str();
+					std::thread t(OneThreadLoad2, r, NewName, NewID, hh);
+					t.detach();
+
+				}
+				else
+				{
+					// Download
+					GenericDialogState(hh, 0);
+					SetDlgItemText(hh, 701, L"Opening...");
+					GOD::ystring fid = t2.data();
+					r->resultFile = fid;
+					DWORD st = (DWORD)GetWindowLongPtr(GetDlgItem(hh, 801), GWL_STYLE);
+					st &= ~PBS_MARQUEE;
+					SetWindowLong(GetDlgItem(hh, 801), GWL_STYLE, st);
+
+					if (r->read)
+					{
+						auto foo = [](GOD::ystring fid, RGF::RGBF* r)
+						{
+							r->InProgress = true;
+							auto hr = r->one->Download(fid.a_str(), 0, r->read, 0, (unsigned long long) - 1, [](unsigned long long f, unsigned long long t, void* lp) -> HRESULT
+								{
+									RGF::RGBF* s = (RGF::RGBF*)lp;
+									f *= 100;
+									f = (int)(f / t);
+									SendDlgItemMessage(s->hH, 801, PBM_SETPOS, (WPARAM)f, 0);
+									if (s->ShouldCancelProp)
+										return E_FAIL;
+									return S_OK;
+								}, r);
+							r->rs = hr;
+							r->InProgress = false;
+							SendMessage(r->hH, WM_CLOSE, 0, 0);
+						};
+
+						std::thread tx(foo, fid, r);
+						tx.detach();
+						return 0;
+					}
+					SendMessage(r->hH, WM_CLOSE, 0, 0);
+				}
+			}
+
+			return 0;
 		}
 		case WM_COMMAND:
 		{
 			int LW = LOWORD(ww);
+			if (LW == 211)
+			{
+				// Top
+				GenericDialogState(hh, 0);
+				r->onedrive.root = r->one->GetRootFolderID();
+				std::thread t(OneThreadLoad2, r, "/", "root", hh);
+				t.detach();
+			}
+
+			if (LW == 212)
+			{
+				// New folder
+				std::vector<wchar_t> nf(1000);
+				if (!AskText(hh, L"New folder", L"New folder name:", nf.data()))
+					return 0;
+				RGF::GOD::ystring nff = nf.data();
+				r->one->CreateFolder(nff.a_str(), r->onedrive.root.c_str());
+				GenericDialogState(hh, 0);
+				std::thread t(OneThreadLoad2, r, nff, r->onedrive.root, hh);
+				t.detach();
+			}
+
+			if (LW == 213)
+			{
+				// Logout
+				r->onedrive.tokens[0] = "";
+				r->onedrive.tokens[1] = "";
+				r->one->Unauth();
+				r->one = nullptr;
+				SendMessage(GetParent(hh), PSM_SETCURSEL, 0, 0);
+			}
+
+
+			// Save
+			if (LW == 202)
+			{
+				GenericDialogState(hh, 0);
+				std::vector<wchar_t> t(1000);
+				GetDlgItemText(hh, 101, t.data(), 1000);
+				std::wstring fi = t.data();
+				if (fi.empty())
+					return 0;
+
+				if (wcschr(fi.c_str(), L'.') == 0)
+				{
+					if (r->DefExt.length())
+					{
+						fi += L".";
+						fi += r->DefExt;
+					}
+				}
+
+				// We upload to one
+				SendMessage(GetDlgItem(hh, 801), PBM_SETMARQUEE, 0, 0);
+				SetDlgItemText(hh, 701, L"Saving...");
+				DWORD st = (DWORD)GetWindowLongPtr(GetDlgItem(hh, 801), GWL_STYLE);
+				st &= ~PBS_MARQUEE;
+				SetWindowLong(GetDlgItem(hh, 801), GWL_STYLE, st);
+				r->InProgress = true;
+				auto up = [](GOD::ystring fi, RGF::RGBF* s)
+				{
+					std::string ret,ret2;
+					auto hr = s->one->Upload2(0,0, s->d, s->sz, s->onedrive.root.c_str(), fi.a_str(), ret, ret2,
+						[](unsigned long long f, unsigned long long t, void* lp) -> HRESULT
+						{
+							RGBF* s = (RGBF*)lp;
+							f *= 100;
+							f = (int)(f / t);
+							SendDlgItemMessage(s->hH, 801, PBM_SETPOS, (WPARAM)f, 0);
+							if (s->ShouldCancelProp)
+								return E_FAIL;
+							return S_OK;
+						}
+					, s);
+					s->InProgress = false;
+					s->rs = hr;
+					if (SUCCEEDED(hr))
+						s->resultFile = ret;
+					SendMessage(s->hH, WM_CLOSE, 0, 0);
+				};
+
+				GOD::ystring y = fi.c_str();
+				std::thread tf(up, y, r);
+				tf.detach();
+			}
+
+
+
 			return 0;
 		}
+
+
+		case WM_USER + 501:
+		{
+			FillList(hh,mm,ww,ll);
+			return 0;
+		}
+
 		}
 		return 0;
 	};
@@ -695,7 +925,7 @@ namespace RGF
 			Pages.push_back(p1);
 		}
 		// DropBox
-		if (true)
+/*		if (true)
 		{
 			PROPSHEETPAGE p1 = { 0 };
 			p1.dwSize = sizeof(p1);
@@ -707,6 +937,7 @@ namespace RGF
 			p1.lParam = (LPARAM)& s;
 			Pages.push_back(p1);
 		}
+*/
 
 		PROPSHEETHEADER hdr = { 0 };
 		hdr.dwSize = sizeof(hdr);

@@ -33,9 +33,11 @@ s.google.tokens[1] = "... refresh token ...";
 ```
 
 If you do not pass an access token, the user will be asked to login. By default, this is done in an external browser (your default), but 
-you can change the function "RunUrl" to use my own AX interface which opens an IWebBrowser control.
+you can change the function "RunUrl" to use my own AX interface which opens an IWebBrowser control. Note that IWebBrowser2 might be incompatible
+with the latest HTML features, so it is recommended to use the default external browser.
 
 Your redirect URL is listening at port 9932 by default.
+
 
 
 ## Opening

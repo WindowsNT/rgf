@@ -646,8 +646,6 @@ namespace RGF
 				ShowWindow(GetDlgItem(hh, 701), SW_HIDE);
 				ShowWindow(GetDlgItem(hh, 801), SW_HIDE);
 			}
-
-
 			return true;
 		}
 

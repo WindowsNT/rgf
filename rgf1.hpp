@@ -4986,6 +4986,55 @@ namespace RGF
 				if (Out)
 				{
 					ShellExecute(0, L"open", url, 0, 0, SW_SHOWMAXIMIZED);
+
+
+						const char* res = "\x01\x00\xFF\xFF\x00\x00\x00\x00\x00\x00\x00\x00\xC8\x08\x01\x80\x02\x00\x00\x00\x00\x00\x36\x01\x73\x00\x00\x00\x00\x00\x00\x00\x08\x00\x90\x01\x00\x01\x4D\x00\x53\x00\x20\x00\x53\x00\x68\x00\x65\x00\x6C\x00\x6C\x00\x20\x00\x44\x00\x6C\x00\x67\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x02\x50\x08\x00\x35\x00\x27\x01\x08\x00\xBD\x02\x00\x00\xFF\xFF\x82\x00\x50\x00\x6C\x00\x65\x00\x61\x00\x73\x00\x65\x00\x20\x00\x77\x00\x61\x00\x69\x00\x74\x00\x2E\x00\x2E\x00\x2E\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x50\xFE\x00\x61\x00\x32\x00\x0E\x00\x02\x00\x00\x00\xFF\xFF\x80\x00\x43\x00\x61\x00\x6E\x00\x63\x00\x65\x00\x6C\x00\x00\x00\x00\x00";
+						struct U
+						{
+							REST* t;
+						};
+						U u;
+						u.t = this;
+						auto A_DP = [](HWND hh, UINT mm, WPARAM ww, LPARAM ll) -> INT_PTR
+						{
+							U* u = (U*)GetWindowLongPtr(hh, GWLP_USERDATA);
+							switch (mm)
+							{
+							case WM_INITDIALOG:
+							{
+								SetWindowLongPtr(hh, GWLP_USERDATA, ll);
+								u = (U*)GetWindowLongPtr(hh, GWLP_USERDATA);
+								u->t->hAuthWindow = hh;
+								SetDlgItemText(hh, 701, L"Login to your browser...");
+
+								return true;
+							}
+							case WM_CLOSE:
+							{
+								EndDialog(hh, IDCANCEL);
+								return 0;
+							}
+							case WM_COMMAND:
+							{
+								if (LOWORD(ww) == IDCANCEL)
+								{
+
+									EndDialog(hh, IDCANCEL);
+								}
+								return 0;
+							}
+							}
+
+							return 0;
+						};
+
+						std::thread tx([&]()
+							{
+								CoInitializeEx(0, COINIT_APARTMENTTHREADED);
+								DialogBoxIndirectParam(GetModuleHandle(0), (LPCDLGTEMPLATEW)res, 0, A_DP, (LPARAM)& u);
+							});
+						tx.join();
+
 					return;
 				}
 				const char* res = "\x01\x00\xFF\xFF\x00\x00\x00\x00\x00\x00\x00\x00\xC8\x08\xCF\x80\x00\x00\x00\x00\x00\x00\xFA\x01\x7E\x01\x00\x00\x00\x00\x00\x00\x08\x00\x90\x01\x00\x01\x4D\x00\x53\x00\x20\x00\x53\x00\x68\x00\x65\x00\x6C\x00\x6C\x00\x20\x00\x44\x00\x6C\x00\x67\x00\x00\x00";
@@ -5103,6 +5152,12 @@ namespace RGF
 
 
 		public:
+
+
+			ystring at()
+			{
+				return accesstoken;
+			}
 
 			bool HasRefresh()
 			{
@@ -5265,6 +5320,33 @@ namespace RGF
 				if (!j.has<jsonxx::String>("refresh_token"))
 					return S_FALSE;
 				refreshtoken = j.get<jsonxx::String>("refresh_token");
+				return S_OK;
+			}
+
+			HRESULT RefreshToken()
+			{
+				Disconnect();
+				if (FAILED(Connect(TokenEndpoint.c_str(), true)))
+					return false;
+
+				string dk; // request
+				dk += "&grant_type=refresh_token";
+				dk += "&client_id=";
+				dk += client.a_str();
+				dk += "&client_secret=";
+				dk += secret.a_str();
+				dk += "&redirect_uri=";
+				dk += RedirectURI.a_str();
+				dk += "&refresh_token=";
+				dk += refreshtoken.a_str();
+				auto hi = RequestWithBuffer(TokenEndpointPath.c_str(), L"POST", { L"Content-type: application/x-www-form-urlencoded" }, dk.data(), dk.size());
+				auto jj = jsonreturn(hi);
+				Disconnect();
+				jsonxx::Object j;
+				j.parse(jj.c_str());
+				if (!j.has<jsonxx::String>("access_token"))
+					return E_FAIL;
+				accesstoken = j.get<jsonxx::String>("access_token");
 				return S_OK;
 			}
 

@@ -81,7 +81,7 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	s.db.tokens[1] = rr.GetRootElement()["tokens"]["dropbox"].vv("t2").GetValue();
 
 
-	auto rv = RGF::Save2(s);
+	auto rv = RGF::SaveX(s);
 
 	// Save tokens if we got them
 	if (s.google.tokens.size() == 3)
@@ -108,7 +108,7 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	s2.read = &r;
 	s2.Filter.clear();
 	s2.resultFile.clear();
-	rv = RGF::Open(s2);
+	rv = RGF::OpenX(s2);
 
 	return 0;
 	}

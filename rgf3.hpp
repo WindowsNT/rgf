@@ -983,5 +983,21 @@ namespace RGF
 		return FunctionX2(s);
 	}
 
+	HRESULT SaveX(RGBF& s)
+	{
+		auto e = FunctionX(s);
+		if (e == E_UNEXPECTED)
+			e = FunctionX2(s);
+		return e;
+	}
+
+	HRESULT OpenX(RGBF& s)
+	{
+		s.func = 1;
+		auto e = FunctionX(s);
+		if (e == E_UNEXPECTED)
+			e = FunctionX2(s);
+		return e;
+	}
 
 }

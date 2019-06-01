@@ -483,8 +483,18 @@ namespace RGF
 					SetWindowText(hh, L"Open...");
 			}
 
-			SetWindowText(hX, SaveFileX.c_str());
+			try
+			{
+				auto st = SendMessage(hX, WM_SETTEXT,0,(LPARAM)SaveFileX.c_str());
+				if (st == 0)
+					throw;
 
+			}
+			catch (...)
+			{
+				EndDialog(hh, -5);
+				return 0;
+			}
 			u = (RGF::UWPLIB::UWPCONTROL*)SendMessage(hX, (WM_USER + 100), 0, 0);
 			auto Top = u->ins.as<TopView>();
 			if (s->s->func == 1)
@@ -1336,9 +1346,10 @@ namespace RGF
 
 
 
+		INT_PTR rd = 0;
 		if (s.NoBrowserKey)
 		{
-			DialogBoxIndirectParam(GetModuleHandle(0), (LPCDLGTEMPLATEW)res, s.hParent, A_DP, (LPARAM)& is);
+			rd = DialogBoxIndirectParam(GetModuleHandle(0), (LPCDLGTEMPLATEW)res, s.hParent, A_DP, (LPARAM)& is);
 		}
 		else
 		{
@@ -1348,9 +1359,11 @@ namespace RGF
 			PathStripPath(fn.data());
 			RGF::RKEY k(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Internet Explorer\\Main\\FeatureControl\\FEATURE_BROWSER_EMULATION");
 			k[fn.data()] = 11001UL;
-			DialogBoxIndirectParam(GetModuleHandle(0), (LPCDLGTEMPLATEW)res, s.hParent, A_DP, (LPARAM)& is);
+			rd = DialogBoxIndirectParam(GetModuleHandle(0), (LPCDLGTEMPLATEW)res, s.hParent, A_DP, (LPARAM)& is);
 			k[fn.data()].Delete();
 		}
+		if (rd == -5)
+			return E_UNEXPECTED;
 		return s.rs;
 	}
 

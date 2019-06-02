@@ -36,6 +36,7 @@
 #include <functional>
 #include <mshtml.h>
 #include <exdisp.h>
+#include <versionhelpers.h>
 #include <comutil.h>
 #include <exdispid.h>
 #include <WinSock2.h>

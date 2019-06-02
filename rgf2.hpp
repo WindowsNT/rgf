@@ -1326,8 +1326,9 @@ namespace RGF
 
 	HRESULT FunctionX(RGBF & s)
 	{
-		if (!IsWindows10OrGreater())
-			return E_UNEXPECTED;
+		// No, we need manifest
+//		if (!IsWindows10OrGreater())
+	//		return E_UNEXPECTED;
 
 		RGF::AXLIBRARY::AXRegister();
 		RGF::UWPLIB::Register();
